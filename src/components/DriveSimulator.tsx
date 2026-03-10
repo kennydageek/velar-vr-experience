@@ -19,26 +19,23 @@ type Telemetry = {
   absActive: boolean;
 };
 
-function Wheel({ wheelRef, steerRef }: { wheelRef?: (m: THREE.Mesh) => void; steerRef?: (g: THREE.Group) => void }) {
+function Wheel({ wheelRef, steerRef }: { wheelRef?: (g: THREE.Group) => void; steerRef?: (g: THREE.Group) => void }) {
   return (
     <group ref={(g) => g && steerRef?.(g)}>
-      <mesh
-        ref={(m) => m && wheelRef?.(m)}
-        rotation={[Math.PI / 2, 0, 0]}
-        castShadow
-        receiveShadow
-      >
-        <cylinderGeometry args={[0.24, 0.24, 0.16, 30]} />
-        <meshStandardMaterial color="#07090d" roughness={0.82} metalness={0.18} />
-      </mesh>
-      <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.145, 0.145, 0.17, 24]} />
-        <meshStandardMaterial color="#9ea6af" roughness={0.32} metalness={0.88} />
-      </mesh>
-      <mesh>
-        <torusGeometry args={[0.12, 0.01, 8, 24]} />
-        <meshStandardMaterial color="#dce3ea" metalness={0.95} roughness={0.2} />
-      </mesh>
+      <group ref={(g) => g && wheelRef?.(g)}>
+        <mesh rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
+          <cylinderGeometry args={[0.24, 0.24, 0.16, 30]} />
+          <meshStandardMaterial color="#07090d" roughness={0.82} metalness={0.18} />
+        </mesh>
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.145, 0.145, 0.17, 24]} />
+          <meshStandardMaterial color="#9ea6af" roughness={0.32} metalness={0.88} />
+        </mesh>
+        <mesh>
+          <torusGeometry args={[0.12, 0.01, 8, 24]} />
+          <meshStandardMaterial color="#dce3ea" metalness={0.95} roughness={0.2} />
+        </mesh>
+      </group>
     </group>
   );
 }
@@ -56,7 +53,7 @@ function DrivePhysics({
   const chassisRef = useRef<THREE.Group>(null);
   const brakeLight = useRef<THREE.Mesh>(null);
 
-  const wheelSpinRefs = useRef<THREE.Mesh[]>([]);
+  const wheelSpinRefs = useRef<THREE.Group[]>([]);
   const frontSteerRefs = useRef<THREE.Group[]>([]);
 
   const heading = useRef(0);
