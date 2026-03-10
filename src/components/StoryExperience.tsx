@@ -35,6 +35,8 @@ export function StoryExperience() {
   const { scrollYProgress } = useScroll({ target: wrapperRef, offset: ["start start", "end end"] });
 
   const progress = useTransform(scrollYProgress, [0, 1], [0, 0.999]);
+  const textY = useTransform(scrollYProgress, [0, 1], [0, -120]);
+  const textOpacity = useTransform(scrollYProgress, [0, 0.15, 0.85, 1], [1, 1, 1, 0.35]);
   const [p, setP] = useState(0);
   const [focus, setFocus] = useState<FocusKey>("power");
   const [audioOn, setAudioOn] = useState(false);
@@ -86,13 +88,13 @@ export function StoryExperience() {
             >
               {audioOn ? "AUDIO ON" : "AUDIO OFF"}
             </button>
-            <button className="rounded-full border border-white/25 px-5 py-2 text-xs tracking-[0.2em] text-white/80 transition hover:border-white/55">
-              RESERVE
-            </button>
+            <a href="/drive" className="rounded-full border border-cyan-300/60 bg-cyan-300/10 px-5 py-2 text-xs tracking-[0.2em] text-cyan-100 transition hover:border-cyan-200 hover:bg-cyan-300/20">
+              TEST DRIVE
+            </a>
           </div>
         </div>
 
-        <div className="absolute bottom-8 left-6 z-20 max-w-xl md:left-10">
+        <motion.div style={{ y: textY, opacity: textOpacity }} className="absolute bottom-8 left-6 z-20 max-w-xl md:left-10">
           <motion.p key={slides[steps].tag} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-xs tracking-[0.32em] text-cyan-200/85">
             {slides[steps].tag}
           </motion.p>
@@ -120,7 +122,7 @@ export function StoryExperience() {
               </button>
             ))}
           </div>
-        </div>
+        </motion.div>
       </div>
     </div>
   );
