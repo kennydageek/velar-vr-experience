@@ -171,23 +171,24 @@ function DrivePhysics({
 
   return (
     <group ref={modelRef}>
-      <group ref={chassisRef} scale={0.0175} position={[0, 0.12, 0]}>
+      <group ref={chassisRef} scale={0.0115} position={[0, -0.02, 0]}>
         <primitive object={gltf.scene} />
+
+        {/* model-space lighting helpers aligned to ferrari coordinates */}
+        <mesh position={[75, 35, 14]}>
+          <boxGeometry args={[4, 3, 10]} />
+          <meshStandardMaterial color="#d8f2ff" emissive="#8ad8ff" emissiveIntensity={1.9} />
+        </mesh>
+        <mesh position={[75, 35, -14]}>
+          <boxGeometry args={[4, 3, 10]} />
+          <meshStandardMaterial color="#d8f2ff" emissive="#8ad8ff" emissiveIntensity={1.9} />
+        </mesh>
+
+        <mesh ref={brakeLight} position={[-70, 35, 0]}>
+          <boxGeometry args={[6, 4, 45]} />
+          <meshStandardMaterial color="#ff7f93" emissive="#ff334e" emissiveIntensity={0.35} />
+        </mesh>
       </group>
-
-      <mesh position={[-1.2, 0.31, 0.34]}>
-        <boxGeometry args={[0.06, 0.04, 0.12]} />
-        <meshStandardMaterial color="#d8f2ff" emissive="#8ad8ff" emissiveIntensity={1.8} />
-      </mesh>
-      <mesh position={[-1.2, 0.31, -0.34]}>
-        <boxGeometry args={[0.06, 0.04, 0.12]} />
-        <meshStandardMaterial color="#d8f2ff" emissive="#8ad8ff" emissiveIntensity={1.8} />
-      </mesh>
-
-      <mesh ref={brakeLight} position={[1.2, 0.27, 0]}>
-        <boxGeometry args={[0.12, 0.03, 0.94]} />
-        <meshStandardMaterial color="#ff7f93" emissive="#ff334e" emissiveIntensity={0.35} />
-      </mesh>
     </group>
   );
 }
@@ -348,4 +349,3 @@ export function DriveSimulator() {
   );
 }
 
-useGLTF.preload("https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/ferrari.glb");
