@@ -190,23 +190,23 @@ function DrivePhysics({
         </mesh>
       </group>
 
-      <group position={[1.02, -0.03, -0.58]}>
+      <group position={[1.02, -0.03, -0.46]}>
         <Wheel
           steerRef={(g) => (frontSteerRefs.current[0] = g)}
           wheelRef={(m) => (wheelSpinRefs.current[0] = m)}
         />
       </group>
-      <group position={[1.02, -0.03, 0.58]}>
+      <group position={[1.02, -0.03, 0.46]}>
         <Wheel
           steerRef={(g) => (frontSteerRefs.current[1] = g)}
           wheelRef={(m) => (wheelSpinRefs.current[1] = m)}
         />
       </group>
 
-      <group position={[-1.02, -0.03, -0.58]}>
+      <group position={[-1.02, -0.03, -0.46]}>
         <Wheel wheelRef={(m) => (wheelSpinRefs.current[2] = m)} />
       </group>
-      <group position={[-1.02, -0.03, 0.58]}>
+      <group position={[-1.02, -0.03, 0.46]}>
         <Wheel wheelRef={(m) => (wheelSpinRefs.current[3] = m)} />
       </group>
 
