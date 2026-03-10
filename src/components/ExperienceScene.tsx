@@ -1,9 +1,10 @@
 "use client";
 
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Environment, Float, useGLTF } from "@react-three/drei";
-import { useMemo, useRef } from "react";
+import { Environment, Float } from "@react-three/drei";
+import { useRef } from "react";
 import * as THREE from "three";
+import { FerrariModel } from "./FerrariModel";
 
 type FocusKey = "power" | "battery" | "aero";
 
@@ -16,7 +17,6 @@ const CAMERA_POINTS = [
 
 function GltfCar({ progress, focus, reducedMotion }: { progress: number; focus: FocusKey; reducedMotion: boolean }) {
   const group = useRef<THREE.Group>(null);
-  const gltf = useGLTF("https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/ferrari.glb");
   const brakeRef = useRef<THREE.Mesh>(null);
 
   useFrame((state) => {
@@ -35,14 +35,14 @@ function GltfCar({ progress, focus, reducedMotion }: { progress: number; focus: 
   const glowColor = focus === "power" ? "#39d3ff" : focus === "battery" ? "#97ffbf" : "#c4a1ff";
 
   return (
-    <group ref={group} scale={0.0115} position={[0, -0.02, 0]}>
-      <primitive object={gltf.scene} />
-      <mesh ref={brakeRef} position={[-70, 35, 0]}>
-        <boxGeometry args={[6, 4, 45]} />
+    <group ref={group} rotation-y={Math.PI} position={[0, 0.18, 0]}>
+      <FerrariModel targetLength={2.6} />
+      <mesh ref={brakeRef} position={[1.2, 0.27, 0]}>
+        <boxGeometry args={[0.12, 0.03, 0.94]} />
         <meshStandardMaterial emissive="#ff334e" color="#ff7891" emissiveIntensity={1} />
       </mesh>
-      <mesh position={[75, 35, 0]}>
-        <boxGeometry args={[4, 3, 42]} />
+      <mesh position={[-1.2, 0.27, 0]}>
+        <boxGeometry args={[0.09, 0.03, 0.84]} />
         <meshStandardMaterial emissive={glowColor} color="#9ae9ff" emissiveIntensity={1.2} />
       </mesh>
     </group>
