@@ -32,6 +32,7 @@ function DrivePhysics({
   const chassisRef = useRef<THREE.Group>(null);
   const brakeLight = useRef<THREE.Mesh>(null);
   const wheelRefs = useRef<THREE.Object3D[]>([]);
+  const frontWheelRefs = useRef<THREE.Object3D[]>([]);
   const gltf = useGLTF("https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/ferrari.glb");
 
   const fittedCar = useMemo(() => {
@@ -49,15 +50,29 @@ function DrivePhysics({
     const s = targetLength / currentLength;
     cloned.scale.setScalar(s);
 
-    // Ferrari GLB wheel names (same as three.js examples)
-    const carModel = cloned.children[0];
-    if (carModel?.getObjectByName) {
-      wheelRefs.current = [
-        carModel.getObjectByName("wheel_fl"),
-        carModel.getObjectByName("wheel_fr"),
-        carModel.getObjectByName("wheel_rl"),
-        carModel.getObjectByName("wheel_rr"),
-      ].filter((w): w is THREE.Object3D => w != null);
+    // Ferrari GLB wheel names (robust lookup from full scene graph)
+    const wheelFL = cloned.getObjectByName("wheel_fl");
+    const wheelFR = cloned.getObjectByName("wheel_fr");
+    const wheelRL = cloned.getObjectByName("wheel_rl");
+    const wheelRR = cloned.getObjectByName("wheel_rr");
+
+    const direct = [wheelFL, wheelFR, wheelRL, wheelRR].filter((w): w is THREE.Object3D => w != null);
+
+    if (direct.length === 4) {
+      wheelRefs.current = direct;
+      frontWheelRefs.current = [wheelFL, wheelFR].filter((w): w is THREE.Object3D => w != null);
+    } else {
+      const found: THREE.Object3D[] = [];
+      const front: THREE.Object3D[] = [];
+      cloned.traverse((obj) => {
+        const n = obj.name?.toLowerCase?.() ?? "";
+        if (n.includes("wheel")) {
+          found.push(obj);
+          if (n.includes("fl") || n.includes("fr") || n.includes("front")) front.push(obj);
+        }
+      });
+      wheelRefs.current = found;
+      frontWheelRefs.current = front;
     }
 
     cloned.traverse((obj) => {
@@ -187,17 +202,23 @@ function DrivePhysics({
     chassisRef.current.rotation.z = THREE.MathUtils.lerp(chassisRef.current.rotation.z, pitch, 0.1);
     chassisRef.current.position.y = chassisBaseY + bounce;
 
-    // Wheel roll when driving or reversing (Ferrari GLB uses rotation.x for roll)
+    // Wheel roll when driving or reversing
     const wheelRadius = 0.35;
-    const rolling = Math.abs(velocity.current) > 0.1;
+    const rolling = Math.abs(velocity.current) > 0.08;
     if (rolling) {
       const spin = (velocity.current / wheelRadius) * dt;
       wheelRefs.current.forEach((w) => {
-        if (w) w.rotation.x -= spin;
+        if (!w) return;
+        // most Ferrari exports roll on X; keep fallback for different rigs
+        w.rotation.x -= spin;
       });
     }
 
     const steerBase = THREE.MathUtils.clamp(steer.current * 0.44, -0.44, 0.44);
+    frontWheelRefs.current.forEach((w) => {
+      if (!w) return;
+      w.rotation.y = steerBase;
+    });
 
     const braking = wantsBrake;
     if (brakeLight.current) {
