@@ -22,7 +22,7 @@ function Wheel({ wheelRef, steerRef }: { wheelRef?: (m: THREE.Mesh) => void; ste
     <group ref={(g) => g && steerRef?.(g)}>
       <mesh
         ref={(m) => m && wheelRef?.(m)}
-        rotation={[Math.PI / 2, 0, 0]}
+        rotation={[0, 0, Math.PI / 2]}
         castShadow
         receiveShadow
       >
@@ -148,9 +148,11 @@ function DrivePhysics({
     });
 
     // wheel spin
-    const spin = (velocity.current / 0.5) * dt;
+    // More natural wheel roll rate (avoid hyper-fast 360-looking spin)
+    const wheelRadius = 0.24;
+    const spin = (velocity.current / (wheelRadius * 2.4)) * dt;
     wheelSpinRefs.current.forEach((w) => {
-      if (w) w.rotation.z -= spin;
+      if (w) w.rotation.x -= spin;
     });
 
     const braking = wantsBrake;
@@ -270,25 +272,6 @@ function CameraRig({ carRef, mode }: { carRef: MutableRefObject<THREE.Group | nu
   );
 }
 
-function RoadPattern() {
-  return (
-    <group>
-      {Array.from({ length: 18 }).map((_, row) => {
-        return Array.from({ length: 12 }).map((__, col) => {
-          const z = row * 5.5 - 47;
-          const x = col * 0.95 - 5.2;
-          const rot = (row + col) % 2 === 0 ? Math.PI / 6 : -Math.PI / 6;
-          return (
-            <mesh key={`${row}-${col}`} position={[x, -0.339, z]} rotation={[-Math.PI / 2, 0, rot]}>
-              <boxGeometry args={[0.18, 0.02, 0.65]} />
-              <meshStandardMaterial color="#0a0e14" />
-            </mesh>
-          );
-        });
-      })}
-    </group>
-  );
-}
 
 export function DriveSimulator() {
   const telemetryRef = useRef<Telemetry>({ speedKmh: 0, rpm: 900, braking: false, steer: 0 });
@@ -324,10 +307,15 @@ export function DriveSimulator() {
 
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.35, 0]} receiveShadow>
           <planeGeometry args={[12, 112]} />
-          <meshStandardMaterial color="#3b3432" roughness={0.96} metalness={0.02} />
+          <meshStandardMaterial color="#34302e" roughness={0.98} metalness={0.01} />
         </mesh>
 
-        <RoadPattern />
+        {Array.from({ length: 14 }).map((_, i) => (
+          <mesh key={i} position={[0, -0.339, i * 7.6 - 49]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[0.22, 2.2]} />
+            <meshStandardMaterial color="#e8ecef" />
+          </mesh>
+        ))}
 
         <Environment preset="city" />
       </Canvas>
