@@ -31,6 +31,7 @@ function DrivePhysics({
   const modelRef = useRef<THREE.Group>(null);
   const chassisRef = useRef<THREE.Group>(null);
   const brakeLight = useRef<THREE.Mesh>(null);
+  const wheelRefs = useRef<THREE.Object3D[]>([]);
   const gltf = useGLTF("https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/ferrari.glb");
 
   const fittedCar = useMemo(() => {
@@ -47,6 +48,17 @@ function DrivePhysics({
     const currentLength = Math.max(0.001, size.x);
     const s = targetLength / currentLength;
     cloned.scale.setScalar(s);
+
+    // Ferrari GLB wheel names (same as three.js examples)
+    const carModel = cloned.children[0];
+    if (carModel?.getObjectByName) {
+      wheelRefs.current = [
+        carModel.getObjectByName("wheel_fl"),
+        carModel.getObjectByName("wheel_fr"),
+        carModel.getObjectByName("wheel_rl"),
+        carModel.getObjectByName("wheel_rr"),
+      ].filter((w): w is THREE.Object3D => w != null);
+    }
 
     cloned.traverse((obj) => {
       const m = obj as THREE.Mesh;
@@ -148,8 +160,8 @@ function DrivePhysics({
     const yawGrip = THREE.MathUtils.lerp(1, 0.58, slipRef.current);
     heading.current += steer.current * (velocity.current / 16) * dt * yawGrip;
 
-    // Fix heading vs model orientation
-    modelRef.current.rotation.y = heading.current - Math.PI / 2;
+    // Ferrari GLB faces -Z; rotation.y = heading + PI makes nose point +Z (along road)
+    modelRef.current.rotation.y = heading.current + Math.PI;
 
     const forwardX = Math.sin(heading.current);
     const forwardZ = Math.cos(heading.current);
@@ -168,11 +180,22 @@ function DrivePhysics({
     modelRef.current.position.x = THREE.MathUtils.clamp(modelRef.current.position.x, -4.6, 4.6);
     modelRef.current.position.z = THREE.MathUtils.clamp(modelRef.current.position.z, -46, 46);
 
-    // suspension pitch + tiny bounce
+    // suspension pitch + tiny bounce (bounce added to base height so car stays on road)
+    const chassisBaseY = 0.42;
     const pitch = THREE.MathUtils.clamp((throttleInput.current - brakeInput.current) * 0.06, -0.08, 0.06);
     const bounce = Math.sin(performance.now() * 0.01 + speedAbs) * (speedAbs > 2 ? 0.007 : 0);
     chassisRef.current.rotation.z = THREE.MathUtils.lerp(chassisRef.current.rotation.z, pitch, 0.1);
-    chassisRef.current.position.y = THREE.MathUtils.lerp(chassisRef.current.position.y, bounce, 0.1);
+    chassisRef.current.position.y = chassisBaseY + bounce;
+
+    // Wheel roll when driving or reversing (Ferrari GLB uses rotation.x for roll)
+    const wheelRadius = 0.35;
+    const rolling = Math.abs(velocity.current) > 0.1;
+    if (rolling) {
+      const spin = (velocity.current / wheelRadius) * dt;
+      wheelRefs.current.forEach((w) => {
+        if (w) w.rotation.x -= spin;
+      });
+    }
 
     const steerBase = THREE.MathUtils.clamp(steer.current * 0.44, -0.44, 0.44);
 
@@ -197,7 +220,7 @@ function DrivePhysics({
 
   return (
     <group ref={modelRef}>
-      <group ref={chassisRef} position={[0, 0.22, 0]}>
+      <group ref={chassisRef} position={[0, 0.42, 0]}>
         <primitive object={fittedCar} />
 
         {/* fallback helper lights in world-scale near body */}
