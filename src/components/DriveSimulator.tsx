@@ -33,6 +33,32 @@ function DrivePhysics({
   const brakeLight = useRef<THREE.Mesh>(null);
   const gltf = useGLTF("https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/ferrari.glb");
 
+  const fittedCar = useMemo(() => {
+    const cloned = gltf.scene.clone(true);
+    const box = new THREE.Box3().setFromObject(cloned);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+
+    // Recenter so camera/controls can reliably track the car body.
+    cloned.position.sub(center);
+
+    // Normalize car length to ~2.4 world units for consistent visibility.
+    const targetLength = 2.4;
+    const currentLength = Math.max(0.001, size.x);
+    const s = targetLength / currentLength;
+    cloned.scale.setScalar(s);
+
+    cloned.traverse((obj) => {
+      const m = obj as THREE.Mesh;
+      if (m.isMesh) {
+        m.castShadow = true;
+        m.receiveShadow = true;
+      }
+    });
+
+    return cloned;
+  }, [gltf.scene]);
+
   const heading = useRef(0);
   const velocity = useRef(0);
   const steer = useRef(0);
@@ -171,21 +197,21 @@ function DrivePhysics({
 
   return (
     <group ref={modelRef}>
-      <group ref={chassisRef} scale={0.0115} position={[0, -0.02, 0]}>
-        <primitive object={gltf.scene} />
+      <group ref={chassisRef} position={[0, 0.22, 0]}>
+        <primitive object={fittedCar} />
 
-        {/* model-space lighting helpers aligned to ferrari coordinates */}
-        <mesh position={[75, 35, 14]}>
-          <boxGeometry args={[4, 3, 10]} />
+        {/* fallback helper lights in world-scale near body */}
+        <mesh position={[-1.2, 0.31, 0.34]}>
+          <boxGeometry args={[0.06, 0.04, 0.12]} />
           <meshStandardMaterial color="#d8f2ff" emissive="#8ad8ff" emissiveIntensity={1.9} />
         </mesh>
-        <mesh position={[75, 35, -14]}>
-          <boxGeometry args={[4, 3, 10]} />
+        <mesh position={[-1.2, 0.31, -0.34]}>
+          <boxGeometry args={[0.06, 0.04, 0.12]} />
           <meshStandardMaterial color="#d8f2ff" emissive="#8ad8ff" emissiveIntensity={1.9} />
         </mesh>
 
-        <mesh ref={brakeLight} position={[-70, 35, 0]}>
-          <boxGeometry args={[6, 4, 45]} />
+        <mesh ref={brakeLight} position={[1.2, 0.27, 0]}>
+          <boxGeometry args={[0.12, 0.03, 0.94]} />
           <meshStandardMaterial color="#ff7f93" emissive="#ff334e" emissiveIntensity={0.35} />
         </mesh>
       </group>
