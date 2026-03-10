@@ -1,7 +1,7 @@
 "use client";
 
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Environment, useGLTF } from "@react-three/drei";
+import { Environment } from "@react-three/drei";
 import Link from "next/link";
 import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import * as THREE from "three";
@@ -19,7 +19,6 @@ function DriveCar({ speedRef, brakeRefValue }: { speedRef: MutableRefObject<numb
   const group = useRef<THREE.Group>(null);
   const wheelRefs = useRef<THREE.Mesh[]>([]);
   const brakeLight = useRef<THREE.Mesh>(null);
-  const gltf = useGLTF("https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/ferrari.glb");
   const heading = useRef(0);
   const velocity = useRef(0);
   const steer = useRef(0);
@@ -49,32 +48,34 @@ function DriveCar({ speedRef, brakeRefValue }: { speedRef: MutableRefObject<numb
   useFrame((state, dt) => {
     if (!group.current) return;
 
-    const maxSpeed = keys.current.shift ? 58 : 42;
-    const accel = 28;
-    const brake = 44;
-    const drag = 10;
+    const maxSpeed = keys.current.shift ? 34 : 24;
+    const accel = 18;
+    const brake = 30;
+    const drag = 7.5;
 
     if (keys.current.w) velocity.current += accel * dt;
     if (keys.current.s) velocity.current -= brake * dt;
-    if (keys.current.space) velocity.current *= 1 - Math.min(0.8, dt * 8);
+    if (keys.current.space) velocity.current *= 1 - Math.min(0.85, dt * 8.5);
 
     if (!keys.current.w && !keys.current.s) {
       velocity.current -= Math.sign(velocity.current) * Math.min(Math.abs(velocity.current), drag * dt);
     }
 
-    velocity.current = THREE.MathUtils.clamp(velocity.current, -14, maxSpeed);
+    velocity.current = THREE.MathUtils.clamp(velocity.current, -9, maxSpeed);
 
     const steerTarget = (keys.current.a ? 1 : 0) + (keys.current.d ? -1 : 0);
-    steer.current = THREE.MathUtils.lerp(steer.current, steerTarget, 0.12);
-    heading.current += steer.current * (velocity.current / 38) * dt;
+    steer.current = THREE.MathUtils.lerp(steer.current, steerTarget, 0.14);
+    heading.current += steer.current * (velocity.current / 22) * dt;
 
     group.current.rotation.y = heading.current;
     group.current.position.x += Math.sin(heading.current) * velocity.current * dt;
     group.current.position.z += Math.cos(heading.current) * velocity.current * dt;
 
-    group.current.position.x = THREE.MathUtils.clamp(group.current.position.x, -9.5, 9.5);
+    // keep on shorter driveway lane
+    group.current.position.x = THREE.MathUtils.clamp(group.current.position.x, -4.2, 4.2);
+    group.current.position.z = THREE.MathUtils.clamp(group.current.position.z, -45, 45);
 
-    const wheelSpin = (velocity.current / 3.4) * dt;
+    const wheelSpin = (velocity.current / 0.52) * dt;
     wheelRefs.current.forEach((w) => {
       if (w) w.rotation.z -= wheelSpin;
     });
@@ -83,47 +84,70 @@ function DriveCar({ speedRef, brakeRefValue }: { speedRef: MutableRefObject<numb
     brakeRefValue.current = braking;
     if (brakeLight.current) {
       const m = brakeLight.current.material as THREE.MeshStandardMaterial;
-      m.emissiveIntensity = braking ? 2.4 : 0.5;
+      m.emissiveIntensity = braking ? 2.6 : 0.35;
     }
 
     const chasePos = new THREE.Vector3(
-      group.current.position.x - Math.sin(heading.current) * 4,
-      2.1,
-      group.current.position.z - Math.cos(heading.current) * 4
+      group.current.position.x - Math.sin(heading.current) * 3.4,
+      1.8,
+      group.current.position.z - Math.cos(heading.current) * 3.4
     );
 
     state.camera.position.lerp(chasePos, 0.08);
-    state.camera.lookAt(group.current.position.x, 0.6, group.current.position.z + 1.2);
+    state.camera.lookAt(group.current.position.x, 0.45, group.current.position.z + 1.1);
 
     speedRef.current = Math.max(0, velocity.current * 3.6);
   });
 
   return (
-    <group ref={group} scale={0.0115} position={[0, 0, 0]}>
-      <primitive object={gltf.scene} />
+    <group ref={group} position={[0, 0, 0]}>
+      {/* previous stylized car model style */}
+      <mesh position={[0, 0.28, 0]} scale={[2.7, 0.55, 1.1]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshPhysicalMaterial color="#0d1117" metalness={0.86} roughness={0.24} clearcoat={1} clearcoatRoughness={0.1} />
+      </mesh>
+
+      <mesh position={[0, 0.7, 0]} scale={[1.4, 0.35, 0.9]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshPhysicalMaterial color="#11161e" metalness={0.72} roughness={0.28} />
+      </mesh>
+
+      <mesh position={[0, 0.73, 0]} scale={[1.12, 0.2, 0.75]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshPhysicalMaterial color="#89d6ff" transmission={0.86} roughness={0.03} thickness={0.2} transparent opacity={0.78} />
+      </mesh>
 
       {[
-        [35, 12, 18],
-        [35, 12, -18],
-        [-35, 12, 18],
-        [-35, 12, -18],
+        [1.02, -0.58],
+        [1.02, 0.58],
+        [-1.02, -0.58],
+        [-1.02, 0.58],
       ].map((p, i) => (
-        <mesh
-          key={i}
-          ref={(el) => {
-            if (el) wheelRefs.current[i] = el;
-          }}
-          position={[p[0], p[1], p[2]]}
-          rotation={[Math.PI / 2, 0, 0]}
-        >
-          <cylinderGeometry args={[6.5, 6.5, 6, 24]} />
-          <meshStandardMaterial color="#080a0f" roughness={0.8} metalness={0.2} />
-        </mesh>
+        <group key={i} position={[p[0], -0.02, p[1]]}>
+          <mesh
+            ref={(el) => {
+              if (el) wheelRefs.current[i] = el;
+            }}
+            rotation={[Math.PI / 2, 0, 0]}
+          >
+            <cylinderGeometry args={[0.23, 0.23, 0.15, 28]} />
+            <meshStandardMaterial color="#05070b" metalness={0.95} roughness={0.28} />
+          </mesh>
+          <mesh>
+            <torusGeometry args={[0.24, 0.05, 10, 28]} />
+            <meshStandardMaterial color="#12151a" roughness={0.86} />
+          </mesh>
+        </group>
       ))}
 
-      <mesh ref={brakeLight} position={[-70, 35, 0]}>
-        <boxGeometry args={[6, 4, 45]} />
-        <meshStandardMaterial color="#ff7f93" emissive="#ff334e" emissiveIntensity={0.5} />
+      <mesh position={[-1.2, 0.27, 0]}>
+        <boxGeometry args={[0.12, 0.03, 0.94]} />
+        <meshStandardMaterial color="#8df3ff" emissive="#27d4ff" emissiveIntensity={0.8} />
+      </mesh>
+
+      <mesh ref={brakeLight} position={[1.2, 0.27, 0]}>
+        <boxGeometry args={[0.12, 0.03, 0.94]} />
+        <meshStandardMaterial color="#ff7f93" emissive="#ff334e" emissiveIntensity={0.35} />
       </mesh>
     </group>
   );
@@ -135,30 +159,31 @@ export function DriveSimulator() {
   const [speed, setSpeed] = useState(0);
 
   useEffect(() => {
-    const t = setInterval(() => setSpeed(speedRef.current), 100);
+    const t = setInterval(() => setSpeed(speedRef.current), 90);
     return () => clearInterval(t);
   }, []);
 
   return (
     <section className="relative h-screen bg-[#020308] text-white">
-      <Canvas dpr={[1, 1.5]} camera={{ position: [0, 2, -5], fov: 55 }}>
+      <Canvas dpr={[1, 1.5]} camera={{ position: [0, 1.8, -3.6], fov: 56 }}>
         <color attach="background" args={["#050910"]} />
-        <fog attach="fog" args={["#050910", 20, 85]} />
-        <ambientLight intensity={0.55} />
+        <fog attach="fog" args={["#050910", 14, 65]} />
+        <ambientLight intensity={0.58} />
         <directionalLight position={[4, 7, 3]} intensity={2.1} color="#d5ebff" />
-        <pointLight position={[0, 3, -12]} color="#58beff" intensity={15} distance={26} />
+        <pointLight position={[0, 2.5, -8]} color="#58beff" intensity={11} distance={20} />
 
         <DriveCar speedRef={speedRef} brakeRefValue={brakeRefValue} />
 
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.4, 0]}>
-          <planeGeometry args={[30, 500]} />
-          <meshStandardMaterial color="#111722" roughness={0.95} />
+        {/* shorter driveway */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.35, 0]}>
+          <planeGeometry args={[10, 110]} />
+          <meshStandardMaterial color="#131a27" roughness={0.95} />
         </mesh>
 
-        {Array.from({ length: 90 }).map((_, i) => (
-          <mesh key={i} position={[0, -0.39, i * 5 - 220]}>
-            <boxGeometry args={[0.3, 0.02, 2.2]} />
-            <meshStandardMaterial color="#f4f6f9" />
+        {Array.from({ length: 18 }).map((_, i) => (
+          <mesh key={i} position={[0, -0.34, i * 6 - 52]}>
+            <boxGeometry args={[0.25, 0.02, 2.1]} />
+            <meshStandardMaterial color="#f3f6fb" />
           </mesh>
         ))}
 
@@ -187,13 +212,11 @@ export function DriveSimulator() {
         </div>
         <div className="rounded-2xl border border-white/15 bg-black/35 p-4 text-xs text-white/80">
           <p className="mb-2 text-[10px] tracking-[0.2em] text-white/60">DRIVE NOTES</p>
+          <p>Short test driveway setup.</p>
           <p>Brake lights intensify on braking.</p>
           <p>Wheel rotation responds to speed.</p>
-          <p>Camera follows steering and velocity.</p>
         </div>
       </div>
     </section>
   );
 }
-
-useGLTF.preload("https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/ferrari.glb");

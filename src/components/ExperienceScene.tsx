@@ -93,4 +93,3 @@ export function ExperienceScene({ progress, focus, reducedMotion }: { progress: 
   );
 }
 
-useGLTF.preload("https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/ferrari.glb");
