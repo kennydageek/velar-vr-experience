@@ -1,12 +1,12 @@
-"use client";
+'use client';
 
-import { Canvas, useFrame } from "@react-three/fiber";
-import { Environment, Float } from "@react-three/drei";
-import { Suspense, useRef } from "react";
-import * as THREE from "three";
-import { FerrariModel } from "./FerrariModel";
+import { Canvas, useFrame } from '@react-three/fiber';
+import { Environment, Float } from '@react-three/drei';
+import { Suspense, useRef } from 'react';
+import * as THREE from 'three';
+import { FerrariModel } from './FerrariModel';
 
-type FocusKey = "power" | "battery" | "aero";
+type FocusKey = 'power' | 'battery' | 'aero';
 
 const CAMERA_POINTS = [
   { p: new THREE.Vector3(0, 1.1, 4.6), l: new THREE.Vector3(0, 0.35, 0) },
@@ -15,14 +15,29 @@ const CAMERA_POINTS = [
   { p: new THREE.Vector3(0, 1.95, 4.0), l: new THREE.Vector3(0, 0.48, 0) },
 ];
 
-function GltfCar({ progress, reducedMotion }: { progress: number; reducedMotion: boolean }) {
+function GltfCar({
+  progress,
+  reducedMotion,
+}: {
+  progress: number;
+  reducedMotion: boolean;
+}) {
   const group = useRef<THREE.Group>(null);
   useFrame((state) => {
     if (!group.current) return;
-    const t = state.clock.getElapsedTime();
-    const drift = reducedMotion ? 0 : Math.sin(t * 0.6) * 0.02;
-    group.current.rotation.y = THREE.MathUtils.lerp(group.current.rotation.y, -0.3 + progress * 0.8, 0.06);
-    group.current.position.y = THREE.MathUtils.lerp(group.current.position.y, drift, 0.1);
+    const drift = reducedMotion
+      ? 0
+      : Math.sin(state.clock.getElapsedTime() * 0.6) * 0.02;
+    group.current.rotation.y = THREE.MathUtils.lerp(
+      group.current.rotation.y,
+      -0.3 + progress * 0.8,
+      0.06,
+    );
+    group.current.position.y = THREE.MathUtils.lerp(
+      group.current.position.y,
+      drift,
+      0.1,
+    );
   });
 
   return (
@@ -50,20 +65,46 @@ function CameraRig({ progress }: { progress: number }) {
   return null;
 }
 
-export function ExperienceScene({ progress, focus, reducedMotion }: { progress: number; focus: FocusKey; reducedMotion: boolean }) {
+export function ExperienceScene({
+  progress,
+  focus,
+  reducedMotion,
+}: {
+  progress: number;
+  focus: FocusKey;
+  reducedMotion: boolean;
+}) {
   return (
     <Canvas dpr={[1, 1.6]} camera={{ position: [0, 1.1, 4.6], fov: 36 }}>
-      <color attach="background" args={["#020308"]} />
-      <fog attach="fog" args={["#020308", 7, 18]} />
+      <color attach="background" args={['#020308']} />
+      <fog attach="fog" args={['#020308', 7, 18]} />
       <ambientLight intensity={0.65} />
-      <directionalLight position={[2.5, 4, 2]} intensity={2.3} color="#badcff" />
-      <pointLight position={[-2.2, 1.8, -1]} intensity={16} color="#2ab7ff" distance={10} />
-      <pointLight position={[2.2, 1.2, 1.6]} intensity={focus === "battery" ? 20 : 10} color="#98ffc2" distance={8} />
+      <directionalLight
+        position={[2.5, 4, 2]}
+        intensity={2.3}
+        color="#badcff"
+      />
+      <pointLight
+        position={[-2.2, 1.8, -1]}
+        intensity={16}
+        color="#2ab7ff"
+        distance={10}
+      />
+      <pointLight
+        position={[2.2, 1.2, 1.6]}
+        intensity={focus === 'battery' ? 20 : 10}
+        color="#98ffc2"
+        distance={8}
+      />
 
       <CameraRig progress={progress} />
 
       <Suspense fallback={null}>
-        <Float speed={reducedMotion ? 0 : 1} rotationIntensity={0.06} floatIntensity={0.1}>
+        <Float
+          speed={reducedMotion ? 0 : 1}
+          rotationIntensity={0.06}
+          floatIntensity={0.1}
+        >
           <GltfCar progress={progress} reducedMotion={reducedMotion} />
         </Float>
       </Suspense>
@@ -77,4 +118,3 @@ export function ExperienceScene({ progress, focus, reducedMotion }: { progress: 
     </Canvas>
   );
 }
-
