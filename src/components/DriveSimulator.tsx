@@ -1,43 +1,68 @@
 "use client";
 
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Environment, OrbitControls } from "@react-three/drei";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import * as THREE from "three";
 
 type Gear = "P" | "R" | "N" | "D";
+type CameraMode = "chase" | "orbit" | "top";
 type Keys = { w: boolean; s: boolean; a: boolean; d: boolean; space: boolean; shift: boolean };
 
 type Telemetry = {
   speedKmh: number;
-  braking: boolean;
   rpm: number;
+  braking: boolean;
+  steer: number;
 };
 
-function DriveCar({
-  speedRef,
-  brakeRefValue,
+function Wheel({ wheelRef, steerRef }: { wheelRef?: (m: THREE.Mesh) => void; steerRef?: (g: THREE.Group) => void }) {
+  return (
+    <group ref={(g) => g && steerRef?.(g)}>
+      <mesh
+        ref={(m) => m && wheelRef?.(m)}
+        rotation={[Math.PI / 2, 0, 0]}
+        castShadow
+        receiveShadow
+      >
+        <cylinderGeometry args={[0.24, 0.24, 0.16, 30]} />
+        <meshStandardMaterial color="#07090d" roughness={0.82} metalness={0.18} />
+      </mesh>
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.145, 0.145, 0.17, 24]} />
+        <meshStandardMaterial color="#9ea6af" roughness={0.32} metalness={0.88} />
+      </mesh>
+      <mesh>
+        <torusGeometry args={[0.12, 0.01, 8, 24]} />
+        <meshStandardMaterial color="#dce3ea" metalness={0.95} roughness={0.2} />
+      </mesh>
+    </group>
+  );
+}
+
+function DrivePhysics({
   gear,
-  carRef,
   telemetryRef,
+  carRef,
 }: {
-  speedRef: MutableRefObject<number>;
-  brakeRefValue: MutableRefObject<boolean>;
   gear: Gear;
-  carRef: MutableRefObject<THREE.Group | null>;
   telemetryRef: MutableRefObject<Telemetry>;
+  carRef: MutableRefObject<THREE.Group | null>;
 }) {
   const modelRef = useRef<THREE.Group>(null);
   const chassisRef = useRef<THREE.Group>(null);
-  const wheelRefs = useRef<THREE.Mesh[]>([]);
   const brakeLight = useRef<THREE.Mesh>(null);
 
+  const wheelSpinRefs = useRef<THREE.Mesh[]>([]);
+  const frontSteerRefs = useRef<THREE.Group[]>([]);
+
   const heading = useRef(0);
-  const velocity = useRef(0); // world forward/back speed m/s-ish
+  const velocity = useRef(0);
   const steer = useRef(0);
   const throttleInput = useRef(0);
   const brakeInput = useRef(0);
+
   const keys = useRef<Keys>({ w: false, s: false, a: false, d: false, space: false, shift: false });
 
   useEffect(() => {
@@ -51,145 +76,141 @@ function DriveCar({
       if (k === "shift") keys.current.shift = down;
     };
 
-    const down = (e: KeyboardEvent) => onKey(e, true);
-    const up = (e: KeyboardEvent) => onKey(e, false);
-    window.addEventListener("keydown", down);
-    window.addEventListener("keyup", up);
+    const kd = (e: KeyboardEvent) => onKey(e, true);
+    const ku = (e: KeyboardEvent) => onKey(e, false);
+    window.addEventListener("keydown", kd);
+    window.addEventListener("keyup", ku);
     return () => {
-      window.removeEventListener("keydown", down);
-      window.removeEventListener("keyup", up);
+      window.removeEventListener("keydown", kd);
+      window.removeEventListener("keyup", ku);
     };
   }, []);
 
   useFrame((_, dt) => {
     if (!modelRef.current || !chassisRef.current) return;
 
-    const boost = keys.current.shift ? 1.15 : 1;
-    const maxForward = 23 * boost;
-    const maxReverse = -8;
-    const accel = 16;
-    const brakePower = 28;
-    const baseDrag = 6.8;
+    const boost = keys.current.shift ? 1.2 : 1;
+    const maxForward = 22 * boost;
+    const maxReverse = -9;
+    const accel = 17;
+    const brakePower = 30;
+    const drag = 7;
 
     const wantsThrottle = keys.current.w;
     const wantsBrake = keys.current.s || keys.current.space;
 
-    // Gear-aware throttle/brake behavior
     let throttleTarget = 0;
     if (gear === "D" && wantsThrottle) throttleTarget = 1;
     if (gear === "R" && wantsThrottle) throttleTarget = -0.7;
-    throttleInput.current = THREE.MathUtils.lerp(throttleInput.current, throttleTarget, 0.12);
-    brakeInput.current = THREE.MathUtils.lerp(brakeInput.current, wantsBrake ? 1 : 0, 0.2);
+
+    throttleInput.current = THREE.MathUtils.lerp(throttleInput.current, throttleTarget, 0.14);
+    brakeInput.current = THREE.MathUtils.lerp(brakeInput.current, wantsBrake ? 1 : 0, 0.22);
 
     velocity.current += throttleInput.current * accel * dt;
     if (wantsBrake) velocity.current -= Math.sign(velocity.current || 1) * brakePower * dt;
 
     if (!wantsThrottle) {
-      velocity.current -= Math.sign(velocity.current) * Math.min(Math.abs(velocity.current), baseDrag * dt);
+      velocity.current -= Math.sign(velocity.current) * Math.min(Math.abs(velocity.current), drag * dt);
     }
 
     if (gear === "P") velocity.current *= 1 - Math.min(0.95, dt * 10);
-    if (gear === "N") velocity.current *= 1 - Math.min(0.65, dt * 4.2);
+    if (gear === "N") velocity.current *= 1 - Math.min(0.7, dt * 4.5);
 
     velocity.current = THREE.MathUtils.clamp(velocity.current, maxReverse, maxForward);
 
-    // Grip/slip: less grip at speed => wider turning feel
     const speedAbs = Math.abs(velocity.current);
     const steerTarget = (keys.current.a ? 1 : 0) + (keys.current.d ? -1 : 0);
-    const grip = THREE.MathUtils.clamp(1 - speedAbs / 42, 0.38, 1);
+    const grip = THREE.MathUtils.clamp(1 - speedAbs / 40, 0.36, 1);
     steer.current = THREE.MathUtils.lerp(steer.current, steerTarget * grip, 0.16);
 
-    // Heading update with slight slip factor
-    const slipFactor = THREE.MathUtils.clamp(speedAbs / 30, 0.05, 0.4);
-    heading.current += steer.current * (velocity.current / 16) * dt * (1 - slipFactor * 0.35);
+    heading.current += steer.current * (velocity.current / 16) * dt;
 
-    // IMPORTANT: car forward orientation fix (no sideways driving)
-    // Our model points along +X visually, so offset yaw to align movement with heading.
-    const modelForwardOffset = -Math.PI / 2;
-    modelRef.current.rotation.y = heading.current + modelForwardOffset;
+    // Fix heading vs model orientation
+    modelRef.current.rotation.y = heading.current - Math.PI / 2;
 
     modelRef.current.position.x += Math.sin(heading.current) * velocity.current * dt;
     modelRef.current.position.z += Math.cos(heading.current) * velocity.current * dt;
 
-    // short driveway limits
-    modelRef.current.position.x = THREE.MathUtils.clamp(modelRef.current.position.x, -4.2, 4.2);
-    modelRef.current.position.z = THREE.MathUtils.clamp(modelRef.current.position.z, -45, 45);
+    // short driveway boundaries
+    modelRef.current.position.x = THREE.MathUtils.clamp(modelRef.current.position.x, -4.6, 4.6);
+    modelRef.current.position.z = THREE.MathUtils.clamp(modelRef.current.position.z, -46, 46);
 
-    // suspension pitch + bounce
-    const accelPitch = THREE.MathUtils.clamp((throttleInput.current - brakeInput.current) * 0.06, -0.08, 0.06);
-    const bounce = Math.sin(performance.now() * 0.008 + speedAbs) * (speedAbs > 1 ? 0.005 : 0);
-    chassisRef.current.rotation.z = THREE.MathUtils.lerp(chassisRef.current.rotation.z, accelPitch, 0.1);
+    // suspension pitch + tiny bounce
+    const pitch = THREE.MathUtils.clamp((throttleInput.current - brakeInput.current) * 0.06, -0.08, 0.06);
+    const bounce = Math.sin(performance.now() * 0.01 + speedAbs) * (speedAbs > 2 ? 0.007 : 0);
+    chassisRef.current.rotation.z = THREE.MathUtils.lerp(chassisRef.current.rotation.z, pitch, 0.1);
     chassisRef.current.position.y = THREE.MathUtils.lerp(chassisRef.current.position.y, bounce, 0.1);
 
+    // front wheel steering visuals
+    const steerAngle = THREE.MathUtils.clamp(steer.current * 0.48, -0.48, 0.48);
+    frontSteerRefs.current.forEach((g) => {
+      if (g) g.rotation.y = steerAngle;
+    });
+
     // wheel spin
-    const wheelSpin = (velocity.current / 0.52) * dt;
-    wheelRefs.current.forEach((w) => {
-      if (w) w.rotation.z -= wheelSpin;
+    const spin = (velocity.current / 0.5) * dt;
+    wheelSpinRefs.current.forEach((w) => {
+      if (w) w.rotation.z -= spin;
     });
 
     const braking = wantsBrake;
-    brakeRefValue.current = braking;
     if (brakeLight.current) {
       const m = brakeLight.current.material as THREE.MeshStandardMaterial;
-      m.emissiveIntensity = braking ? 2.6 : 0.35;
+      m.emissiveIntensity = braking ? 2.7 : 0.35;
     }
 
-    // telemetry
-    speedRef.current = Math.max(0, velocity.current * 3.6);
     telemetryRef.current = {
-      speedKmh: speedRef.current,
+      speedKmh: Math.max(0, velocity.current * 3.6),
+      rpm: THREE.MathUtils.clamp(850 + speedAbs * 230 + Math.abs(throttleInput.current) * 1250, 850, 7600),
       braking,
-      rpm: THREE.MathUtils.clamp(900 + speedAbs * 220 + Math.abs(throttleInput.current) * 1200, 850, 7600),
+      steer: steerAngle,
     };
 
     carRef.current = modelRef.current;
   });
 
   return (
-    <group ref={modelRef} position={[0, 0, 0]}>
+    <group ref={modelRef}>
       <group ref={chassisRef}>
-        <mesh position={[0, 0.28, 0]} scale={[2.7, 0.55, 1.1]}>
+        <mesh position={[0, 0.27, 0]} scale={[2.75, 0.55, 1.08]} castShadow>
           <boxGeometry args={[1, 1, 1]} />
-          <meshPhysicalMaterial color="#0d1117" metalness={0.86} roughness={0.24} clearcoat={1} clearcoatRoughness={0.1} />
+          <meshPhysicalMaterial color="#0d1117" metalness={0.9} roughness={0.2} clearcoat={1} clearcoatRoughness={0.08} />
         </mesh>
 
-        <mesh position={[0, 0.7, 0]} scale={[1.4, 0.35, 0.9]}>
+        <mesh position={[0, 0.68, 0]} scale={[1.44, 0.36, 0.9]} castShadow>
           <boxGeometry args={[1, 1, 1]} />
-          <meshPhysicalMaterial color="#11161e" metalness={0.72} roughness={0.28} />
+          <meshPhysicalMaterial color="#121823" metalness={0.7} roughness={0.27} />
         </mesh>
 
-        <mesh position={[0, 0.73, 0]} scale={[1.12, 0.2, 0.75]}>
+        <mesh position={[0, 0.72, 0]} scale={[1.14, 0.2, 0.74]}>
           <boxGeometry args={[1, 1, 1]} />
-          <meshPhysicalMaterial color="#89d6ff" transmission={0.86} roughness={0.03} thickness={0.2} transparent opacity={0.78} />
+          <meshPhysicalMaterial color="#8fd7ff" transmission={0.85} roughness={0.03} thickness={0.2} transparent opacity={0.78} />
         </mesh>
       </group>
 
-      {[
-        [1.02, -0.58],
-        [1.02, 0.58],
-        [-1.02, -0.58],
-        [-1.02, 0.58],
-      ].map((p, i) => (
-        <group key={i} position={[p[0], -0.02, p[1]]}>
-          <mesh
-            ref={(el) => {
-              if (el) wheelRefs.current[i] = el;
-            }}
-            rotation={[Math.PI / 2, 0, 0]}
-          >
-            <cylinderGeometry args={[0.23, 0.23, 0.15, 28]} />
-            <meshStandardMaterial color="#05070b" metalness={0.95} roughness={0.28} />
-          </mesh>
-          <mesh>
-            <torusGeometry args={[0.24, 0.05, 10, 28]} />
-            <meshStandardMaterial color="#12151a" roughness={0.86} />
-          </mesh>
-        </group>
-      ))}
+      <group position={[1.02, -0.03, -0.58]}>
+        <Wheel
+          steerRef={(g) => (frontSteerRefs.current[0] = g)}
+          wheelRef={(m) => (wheelSpinRefs.current[0] = m)}
+        />
+      </group>
+      <group position={[1.02, -0.03, 0.58]}>
+        <Wheel
+          steerRef={(g) => (frontSteerRefs.current[1] = g)}
+          wheelRef={(m) => (wheelSpinRefs.current[1] = m)}
+        />
+      </group>
+
+      <group position={[-1.02, -0.03, -0.58]}>
+        <Wheel wheelRef={(m) => (wheelSpinRefs.current[2] = m)} />
+      </group>
+      <group position={[-1.02, -0.03, 0.58]}>
+        <Wheel wheelRef={(m) => (wheelSpinRefs.current[3] = m)} />
+      </group>
 
       <mesh position={[-1.2, 0.27, 0]}>
         <boxGeometry args={[0.12, 0.03, 0.94]} />
-        <meshStandardMaterial color="#8df3ff" emissive="#27d4ff" emissiveIntensity={0.8} />
+        <meshStandardMaterial color="#9cf2ff" emissive="#2ad8ff" emissiveIntensity={0.9} />
       </mesh>
 
       <mesh ref={brakeLight} position={[1.2, 0.27, 0]}>
@@ -200,105 +221,137 @@ function DriveCar({
   );
 }
 
-function DriveCamera({ carRef }: { carRef: MutableRefObject<THREE.Group | null> }) {
-  const controlsRef = useRef<any>(null);
+function CameraRig({ carRef, mode }: { carRef: MutableRefObject<THREE.Group | null>; mode: CameraMode }) {
+  const orbitRef = useRef<any>(null);
+  const { camera } = useThree();
 
-  useFrame((state) => {
-    if (!carRef.current || !controlsRef.current) return;
-    const target = carRef.current.position;
-    controlsRef.current.target.lerp(new THREE.Vector3(target.x, target.y + 0.45, target.z), 0.12);
-    controlsRef.current.update();
+  useFrame(() => {
+    if (!carRef.current || !orbitRef.current) return;
+    const p = carRef.current.position;
 
-    // soft auto-follow only when very far
-    const dist = state.camera.position.distanceTo(controlsRef.current.target);
-    if (dist > 9) {
-      const desired = new THREE.Vector3(target.x - 3.2, 1.9, target.z - 3.2);
-      state.camera.position.lerp(desired, 0.03);
+    if (mode === "chase") {
+      const target = new THREE.Vector3(p.x, p.y + 0.44, p.z);
+      orbitRef.current.target.lerp(target, 0.15);
+
+      const desired = new THREE.Vector3(p.x - 3.1, 1.85, p.z - 3.1);
+      camera.position.lerp(desired, 0.06);
+      orbitRef.current.update();
+      return;
     }
+
+    if (mode === "top") {
+      const target = new THREE.Vector3(p.x, p.y + 0.2, p.z);
+      orbitRef.current.target.lerp(target, 0.16);
+      const desired = new THREE.Vector3(p.x, 8, p.z + 0.01);
+      camera.position.lerp(desired, 0.08);
+      orbitRef.current.update();
+      return;
+    }
+
+    // orbit mode: user controls angle/zoom; only target follows car
+    orbitRef.current.target.lerp(new THREE.Vector3(p.x, p.y + 0.45, p.z), 0.12);
+    orbitRef.current.update();
   });
 
   return (
     <OrbitControls
-      ref={controlsRef}
+      ref={orbitRef}
       makeDefault
       enablePan={false}
-      minDistance={2.2}
-      maxDistance={10}
-      minPolarAngle={0.35}
-      maxPolarAngle={1.45}
-      zoomSpeed={0.9}
+      minDistance={2}
+      maxDistance={11}
+      minPolarAngle={0.22}
+      maxPolarAngle={1.5}
+      enableRotate
+      enableZoom
       rotateSpeed={0.8}
+      zoomSpeed={0.9}
     />
   );
 }
 
+function RoadPattern() {
+  return (
+    <group>
+      {Array.from({ length: 18 }).map((_, row) => {
+        return Array.from({ length: 12 }).map((__, col) => {
+          const z = row * 5.5 - 47;
+          const x = col * 0.95 - 5.2;
+          const rot = (row + col) % 2 === 0 ? Math.PI / 6 : -Math.PI / 6;
+          return (
+            <mesh key={`${row}-${col}`} position={[x, -0.339, z]} rotation={[-Math.PI / 2, 0, rot]}>
+              <boxGeometry args={[0.18, 0.02, 0.65]} />
+              <meshStandardMaterial color="#0a0e14" />
+            </mesh>
+          );
+        });
+      })}
+    </group>
+  );
+}
+
 export function DriveSimulator() {
-  const speedRef = useRef(0);
-  const brakeRefValue = useRef(false);
-  const telemetryRef = useRef<Telemetry>({ speedKmh: 0, braking: false, rpm: 900 });
+  const telemetryRef = useRef<Telemetry>({ speedKmh: 0, rpm: 900, braking: false, steer: 0 });
   const carRef = useRef<THREE.Group | null>(null);
 
   const [speed, setSpeed] = useState(0);
   const [rpm, setRpm] = useState(900);
   const [gear, setGear] = useState<Gear>("D");
+  const [mode, setMode] = useState<CameraMode>("chase");
 
   useEffect(() => {
     const t = setInterval(() => {
-      setSpeed(speedRef.current);
+      setSpeed(telemetryRef.current.speedKmh);
       setRpm(telemetryRef.current.rpm);
     }, 90);
     return () => clearInterval(t);
   }, []);
 
-  const gearButtons = useMemo(() => ["P", "R", "N", "D"] as Gear[], []);
+  const gears = useMemo(() => ["P", "R", "N", "D"] as Gear[], []);
+  const modes = useMemo(() => ["chase", "orbit", "top"] as CameraMode[], []);
 
   return (
-    <section className="relative h-screen bg-[#020308] text-white">
-      <Canvas dpr={[1, 1.5]} camera={{ position: [-3.2, 1.9, -3.2], fov: 56 }}>
-        <color attach="background" args={["#050910"]} />
-        <fog attach="fog" args={["#050910", 14, 65]} />
-        <ambientLight intensity={0.58} />
-        <directionalLight position={[4, 7, 3]} intensity={2.1} color="#d5ebff" />
-        <pointLight position={[0, 2.5, -8]} color="#58beff" intensity={11} distance={20} />
+    <section className="relative h-screen bg-[#2f2927] text-white">
+      <Canvas dpr={[1, 1.5]} camera={{ position: [-3.1, 1.9, -3.1], fov: 55 }} shadows>
+        <color attach="background" args={["#37302d"]} />
+        <fog attach="fog" args={["#37302d", 16, 78]} />
+        <ambientLight intensity={0.56} />
+        <directionalLight position={[5, 8, 3]} intensity={2.4} color="#f0f6ff" castShadow />
+        <pointLight position={[0, 2.6, -8]} color="#6dc6ff" intensity={10} distance={22} />
 
-        <DriveCar speedRef={speedRef} brakeRefValue={brakeRefValue} gear={gear} carRef={carRef} telemetryRef={telemetryRef} />
-        <DriveCamera carRef={carRef} />
+        <DrivePhysics gear={gear} telemetryRef={telemetryRef} carRef={carRef} />
+        <CameraRig carRef={carRef} mode={mode} />
 
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.35, 0]}>
-          <planeGeometry args={[10, 110]} />
-          <meshStandardMaterial color="#131a27" roughness={0.95} />
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.35, 0]} receiveShadow>
+          <planeGeometry args={[12, 112]} />
+          <meshStandardMaterial color="#3b3432" roughness={0.96} metalness={0.02} />
         </mesh>
 
-        {Array.from({ length: 18 }).map((_, i) => (
-          <mesh key={i} position={[0, -0.34, i * 6 - 52]}>
-            <boxGeometry args={[0.25, 0.02, 2.1]} />
-            <meshStandardMaterial color="#f3f6fb" />
-          </mesh>
-        ))}
+        <RoadPattern />
 
-        <Environment preset="sunset" />
+        <Environment preset="city" />
       </Canvas>
 
       <div className="absolute left-0 top-0 flex w-full items-center justify-between px-6 py-6">
-        <Link href="/" className="rounded-full border border-white/20 px-4 py-2 text-xs tracking-[0.2em] text-white/80">
+        <Link href="/" className="rounded-full border border-white/25 px-4 py-2 text-xs tracking-[0.2em] text-white/80">
           BACK
         </Link>
-        <p className="text-xs tracking-[0.2em] text-white/70">LIVE DRIVE SIM</p>
+        <p className="text-xs tracking-[0.2em] text-white/80">TEST DRIVE</p>
       </div>
 
-      <div className="absolute bottom-6 left-6 right-6 grid gap-3 md:grid-cols-3">
-        <div className="rounded-2xl border border-white/15 bg-black/35 p-4">
+      <div className="absolute bottom-4 left-4 right-4 grid gap-2 md:grid-cols-3">
+        <div className="rounded-2xl border border-white/20 bg-black/35 p-3">
           <p className="text-[10px] tracking-[0.2em] text-white/60">SPEED / RPM</p>
-          <p className="mt-1 text-3xl font-semibold">
-            {Math.round(speed)} <span className="text-sm text-white/60">km/h</span>
+          <p className="mt-1 text-2xl font-semibold">
+            {Math.round(speed)} <span className="text-xs text-white/60">km/h</span>
           </p>
-          <p className="mt-1 text-sm text-white/70">{Math.round(rpm)} rpm</p>
-          <div className="mt-3 flex gap-2">
-            {gearButtons.map((g) => (
+          <p className="text-xs text-white/75">{Math.round(rpm)} rpm</p>
+          <div className="mt-2 flex gap-1.5">
+            {gears.map((g) => (
               <button
                 key={g}
                 onClick={() => setGear(g)}
-                className={`rounded-full px-3 py-1 text-xs ${gear === g ? "bg-white text-black" : "border border-white/30 text-white/85"}`}
+                className={`rounded-full px-2.5 py-1 text-[10px] ${gear === g ? "bg-white text-black" : "border border-white/30 text-white/85"}`}
               >
                 {g}
               </button>
@@ -306,21 +359,26 @@ export function DriveSimulator() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/15 bg-black/35 p-4 text-xs text-white/80">
-          <p className="mb-2 text-[10px] tracking-[0.2em] text-white/60">DRIVE CONTROLS</p>
-          <p>W = Throttle (in D/R)</p>
-          <p>S = Brake</p>
-          <p>A / D = Steering</p>
-          <p>Space = Handbrake</p>
-          <p>Shift = Extra power</p>
+        <div className="rounded-2xl border border-white/20 bg-black/35 p-3 text-[11px] text-white/85">
+          <p className="mb-1 text-[10px] tracking-[0.2em] text-white/60">DRIVE CONTROLS</p>
+          <p>W throttle · S brake · A/D steer</p>
+          <p>Space handbrake · Shift boost</p>
+          <p className="mt-1 text-white/60">Mouse drag rotate, wheel zoom</p>
         </div>
 
-        <div className="rounded-2xl border border-white/15 bg-black/35 p-4 text-xs text-white/80">
-          <p className="mb-2 text-[10px] tracking-[0.2em] text-white/60">CAMERA CONTROLS</p>
-          <p>Mouse drag = orbit angle</p>
-          <p>Mouse wheel / trackpad = zoom in/out</p>
-          <p>Auto-target tracks the car while driving</p>
-          <p>Grip/slip + suspension + brake lights enabled</p>
+        <div className="rounded-2xl border border-white/20 bg-black/35 p-3 text-[11px] text-white/85">
+          <p className="mb-1 text-[10px] tracking-[0.2em] text-white/60">CAMERA MODE</p>
+          <div className="flex gap-1.5">
+            {modes.map((m) => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                className={`rounded-full px-2.5 py-1 text-[10px] capitalize ${mode === m ? "bg-white text-black" : "border border-white/30 text-white/85"}`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </section>
