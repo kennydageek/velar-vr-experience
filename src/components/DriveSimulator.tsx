@@ -15,6 +15,8 @@ type Telemetry = {
   rpm: number;
   braking: boolean;
   steer: number;
+  slip: number;
+  absActive: boolean;
 };
 
 function Wheel({ wheelRef, steerRef }: { wheelRef?: (m: THREE.Mesh) => void; steerRef?: (g: THREE.Group) => void }) {
@@ -62,6 +64,8 @@ function DrivePhysics({
   const steer = useRef(0);
   const throttleInput = useRef(0);
   const brakeInput = useRef(0);
+  const slipRef = useRef(0);
+  const absPhase = useRef(0);
 
   const keys = useRef<Keys>({ w: false, s: false, a: false, d: false, space: false, shift: false });
 
@@ -107,7 +111,17 @@ function DrivePhysics({
     brakeInput.current = THREE.MathUtils.lerp(brakeInput.current, wantsBrake ? 1 : 0, 0.22);
 
     velocity.current += throttleInput.current * accel * dt;
-    if (wantsBrake) velocity.current -= Math.sign(velocity.current || 1) * brakePower * dt;
+
+    // ABS-like pulsing under heavy braking at speed
+    const speedAbsPreBrake = Math.abs(velocity.current);
+    const absActive = wantsBrake && speedAbsPreBrake > 9;
+    if (absActive) {
+      absPhase.current += dt * 20;
+      const pulse = 0.72 + 0.28 * (0.5 + 0.5 * Math.sin(absPhase.current));
+      velocity.current -= Math.sign(velocity.current || 1) * brakePower * pulse * dt;
+    } else if (wantsBrake) {
+      velocity.current -= Math.sign(velocity.current || 1) * brakePower * dt;
+    }
 
     if (!wantsThrottle) {
       velocity.current -= Math.sign(velocity.current) * Math.min(Math.abs(velocity.current), drag * dt);
@@ -123,13 +137,32 @@ function DrivePhysics({
     const grip = THREE.MathUtils.clamp(1 - speedAbs / 40, 0.36, 1);
     steer.current = THREE.MathUtils.lerp(steer.current, steerTarget * grip, 0.16);
 
-    heading.current += steer.current * (velocity.current / 16) * dt;
+    // Simple traction/slip model: aggressive throttle + steer at speed => more slip
+    const slipDemand = THREE.MathUtils.clamp(
+      (Math.abs(steer.current) * Math.abs(throttleInput.current) * speedAbs) / 14,
+      0,
+      1
+    );
+    slipRef.current = THREE.MathUtils.lerp(slipRef.current, slipDemand, 0.08);
+
+    const yawGrip = THREE.MathUtils.lerp(1, 0.58, slipRef.current);
+    heading.current += steer.current * (velocity.current / 16) * dt * yawGrip;
 
     // Fix heading vs model orientation
     modelRef.current.rotation.y = heading.current - Math.PI / 2;
 
-    modelRef.current.position.x += Math.sin(heading.current) * velocity.current * dt;
-    modelRef.current.position.z += Math.cos(heading.current) * velocity.current * dt;
+    const forwardX = Math.sin(heading.current);
+    const forwardZ = Math.cos(heading.current);
+    const rightX = Math.cos(heading.current);
+    const rightZ = -Math.sin(heading.current);
+
+    modelRef.current.position.x += forwardX * velocity.current * dt;
+    modelRef.current.position.z += forwardZ * velocity.current * dt;
+
+    // lateral drift under slip
+    const lateral = steer.current * Math.abs(velocity.current) * slipRef.current * 0.35;
+    modelRef.current.position.x += rightX * lateral * dt;
+    modelRef.current.position.z += rightZ * lateral * dt;
 
     // short driveway boundaries
     modelRef.current.position.x = THREE.MathUtils.clamp(modelRef.current.position.x, -4.6, 4.6);
@@ -179,7 +212,8 @@ function DrivePhysics({
     const braking = wantsBrake;
     if (brakeLight.current) {
       const m = brakeLight.current.material as THREE.MeshStandardMaterial;
-      m.emissiveIntensity = braking ? 2.7 : 0.35;
+      const absBlink = absActive ? 2.0 + (0.5 + 0.5 * Math.sin(absPhase.current * 1.2)) * 1.2 : 2.7;
+      m.emissiveIntensity = braking ? absBlink : 0.35;
     }
 
     telemetryRef.current = {
@@ -187,6 +221,8 @@ function DrivePhysics({
       rpm: THREE.MathUtils.clamp(850 + speedAbs * 230 + Math.abs(throttleInput.current) * 1250, 850, 7600),
       braking,
       steer: (leftSteer + rightSteer) / 2,
+      slip: slipRef.current,
+      absActive,
     };
 
     carRef.current = modelRef.current;
@@ -295,11 +331,13 @@ function CameraRig({ carRef, mode }: { carRef: MutableRefObject<THREE.Group | nu
 
 
 export function DriveSimulator() {
-  const telemetryRef = useRef<Telemetry>({ speedKmh: 0, rpm: 900, braking: false, steer: 0 });
+  const telemetryRef = useRef<Telemetry>({ speedKmh: 0, rpm: 900, braking: false, steer: 0, slip: 0, absActive: false });
   const carRef = useRef<THREE.Group | null>(null);
 
   const [speed, setSpeed] = useState(0);
   const [rpm, setRpm] = useState(900);
+  const [slip, setSlip] = useState(0);
+  const [absActive, setAbsActive] = useState(false);
   const [gear, setGear] = useState<Gear>("D");
   const [mode, setMode] = useState<CameraMode>("chase");
 
@@ -307,6 +345,8 @@ export function DriveSimulator() {
     const t = setInterval(() => {
       setSpeed(telemetryRef.current.speedKmh);
       setRpm(telemetryRef.current.rpm);
+      setSlip(telemetryRef.current.slip);
+      setAbsActive(telemetryRef.current.absActive);
     }, 90);
     return () => clearInterval(t);
   }, []);
@@ -355,6 +395,8 @@ export function DriveSimulator() {
             {Math.round(speed)} <span className="text-xs text-white/60">km/h</span>
           </p>
           <p className="text-xs text-white/75">{Math.round(rpm)} rpm</p>
+          <p className="text-[10px] text-white/70">Slip: {Math.round(slip * 100)}%</p>
+          <p className={`text-[10px] ${absActive ? "text-amber-300" : "text-white/45"}`}>ABS: {absActive ? "ACTIVE" : "OFF"}</p>
           <div className="mt-2 flex gap-1.5">
             {gears.map((g) => (
               <button
