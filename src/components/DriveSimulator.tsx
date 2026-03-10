@@ -22,7 +22,7 @@ function Wheel({ wheelRef, steerRef }: { wheelRef?: (m: THREE.Mesh) => void; ste
     <group ref={(g) => g && steerRef?.(g)}>
       <mesh
         ref={(m) => m && wheelRef?.(m)}
-        rotation={[0, 0, Math.PI / 2]}
+        rotation={[Math.PI / 2, 0, 0]}
         castShadow
         receiveShadow
       >
@@ -152,7 +152,7 @@ function DrivePhysics({
     const wheelRadius = 0.24;
     const spin = (velocity.current / (wheelRadius * 2.4)) * dt;
     wheelSpinRefs.current.forEach((w) => {
-      if (w) w.rotation.x -= spin;
+      if (w) w.rotation.z -= spin;
     });
 
     const braking = wantsBrake;
