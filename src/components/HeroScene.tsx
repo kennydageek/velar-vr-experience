@@ -19,18 +19,8 @@ function CarShell({ reducedMotion }: CarShellProps) {
   });
 
   return (
-    <group ref={group} rotation-y={Math.PI} position={[0, 0.18, 0]}>
-      <FerrariModel targetLength={2.7} />
-
-      <mesh position={[1.2, 0.27, 0]}>
-        <boxGeometry args={[0.12, 0.03, 0.94]} />
-        <meshStandardMaterial color="#8df3ff" emissive="#27d4ff" emissiveIntensity={0.75} />
-      </mesh>
-
-      <mesh position={[-1.2, 0.27, 0]}>
-        <boxGeometry args={[0.12, 0.03, 0.94]} />
-        <meshStandardMaterial color="#ff5f6d" emissive="#ff3550" emissiveIntensity={0.65} />
-      </mesh>
+    <group ref={group} rotation-y={Math.PI} position={[0, 0.2, 0]}>
+      <FerrariModel targetLength={3.4} />
     </group>
   );
 }
@@ -50,9 +40,10 @@ export function HeroScene({ reducedMotion }: { reducedMotion: boolean }) {
       <color attach="background" args={["#020308"]} />
       <fog attach="fog" args={["#020308", 7, 17]} />
 
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[2.5, 4, 2]} intensity={2.2} color="#b5dcff" castShadow />
-      <pointLight position={[-2, 1.5, -1]} intensity={20} color="#12a6ff" distance={9} />
+      <ambientLight intensity={0.85} />
+      <directionalLight position={[2.5, 4, 2]} intensity={2.6} color="#b5dcff" castShadow />
+      <pointLight position={[-2, 1.5, -1]} intensity={22} color="#12a6ff" distance={10} />
+      <pointLight position={[2.2, 1.4, 1.8]} intensity={14} color="#ffffff" distance={9} />
 
       <Float speed={reducedMotion ? 0 : 1.1} rotationIntensity={0.15} floatIntensity={0.12}>
         <CarShell reducedMotion={reducedMotion} />

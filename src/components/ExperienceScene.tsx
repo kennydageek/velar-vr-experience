@@ -15,36 +15,19 @@ const CAMERA_POINTS = [
   { p: new THREE.Vector3(0, 2.4, 3.2), l: new THREE.Vector3(0, 0.5, 0) },
 ];
 
-function GltfCar({ progress, focus, reducedMotion }: { progress: number; focus: FocusKey; reducedMotion: boolean }) {
+function GltfCar({ progress, reducedMotion }: { progress: number; reducedMotion: boolean }) {
   const group = useRef<THREE.Group>(null);
-  const brakeRef = useRef<THREE.Mesh>(null);
-
   useFrame((state) => {
     if (!group.current) return;
     const t = state.clock.getElapsedTime();
     const drift = reducedMotion ? 0 : Math.sin(t * 0.6) * 0.02;
     group.current.rotation.y = THREE.MathUtils.lerp(group.current.rotation.y, -0.3 + progress * 0.8, 0.06);
     group.current.position.y = THREE.MathUtils.lerp(group.current.position.y, drift, 0.1);
-
-    if (brakeRef.current) {
-      const mat = brakeRef.current.material as THREE.MeshStandardMaterial;
-      mat.emissiveIntensity = focus === "battery" ? 0.5 : 1;
-    }
   });
 
-  const glowColor = focus === "power" ? "#39d3ff" : focus === "battery" ? "#97ffbf" : "#c4a1ff";
-
   return (
-    <group ref={group} rotation-y={Math.PI} position={[0, 0.18, 0]}>
-      <FerrariModel targetLength={2.6} />
-      <mesh ref={brakeRef} position={[1.2, 0.27, 0]}>
-        <boxGeometry args={[0.12, 0.03, 0.94]} />
-        <meshStandardMaterial emissive="#ff334e" color="#ff7891" emissiveIntensity={1} />
-      </mesh>
-      <mesh position={[-1.2, 0.27, 0]}>
-        <boxGeometry args={[0.09, 0.03, 0.84]} />
-        <meshStandardMaterial emissive={glowColor} color="#9ae9ff" emissiveIntensity={1.2} />
-      </mesh>
+    <group ref={group} rotation-y={Math.PI} position={[0, 0.2, 0]}>
+      <FerrariModel targetLength={3.1} />
     </group>
   );
 }
@@ -80,7 +63,7 @@ export function ExperienceScene({ progress, focus, reducedMotion }: { progress: 
       <CameraRig progress={progress} />
 
       <Float speed={reducedMotion ? 0 : 1} rotationIntensity={0.06} floatIntensity={0.1}>
-        <GltfCar progress={progress} focus={focus} reducedMotion={reducedMotion} />
+        <GltfCar progress={progress} reducedMotion={reducedMotion} />
       </Float>
 
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.35, 0]}>
