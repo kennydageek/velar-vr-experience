@@ -8,6 +8,7 @@ import * as THREE from "three";
 
 type Gear = "P" | "R" | "N" | "D";
 type CameraMode = "chase" | "orbit" | "top";
+type GripMode = "comfort" | "sport" | "track";
 type Keys = { w: boolean; s: boolean; a: boolean; d: boolean; space: boolean; shift: boolean };
 
 type Telemetry = {
@@ -21,10 +22,12 @@ type Telemetry = {
 
 function DrivePhysics({
   gear,
+  gripMode,
   telemetryRef,
   carRef,
 }: {
   gear: Gear;
+  gripMode: GripMode;
   telemetryRef: MutableRefObject<Telemetry>;
   carRef: MutableRefObject<THREE.Group | null>;
 }) {
@@ -99,10 +102,10 @@ function DrivePhysics({
   useEffect(() => {
     const onKey = (e: KeyboardEvent, down: boolean) => {
       const k = e.key.toLowerCase();
-      if (k === "w") keys.current.w = down;
-      if (k === "s") keys.current.s = down;
-      if (k === "a") keys.current.a = down;
-      if (k === "d") keys.current.d = down;
+      if (k === "w" || k === "arrowup") keys.current.w = down;
+      if (k === "s" || k === "arrowdown") keys.current.s = down;
+      if (k === "a" || k === "arrowleft") keys.current.a = down;
+      if (k === "d" || k === "arrowright") keys.current.d = down;
       if (k === " ") keys.current.space = down;
       if (k === "shift") keys.current.shift = down;
     };
@@ -120,12 +123,19 @@ function DrivePhysics({
   useFrame((_, dt) => {
     if (!modelRef.current || !chassisRef.current) return;
 
+    const gripCfg =
+      gripMode === "comfort"
+        ? { maxForward: 18, accel: 13, brake: 24, drag: 8.5, gripFloor: 0.5 }
+        : gripMode === "sport"
+          ? { maxForward: 24, accel: 17, brake: 30, drag: 7, gripFloor: 0.4 }
+          : { maxForward: 30, accel: 21, brake: 34, drag: 6, gripFloor: 0.3 };
+
     const boost = keys.current.shift ? 1.2 : 1;
-    const maxForward = 22 * boost;
-    const maxReverse = -9;
-    const accel = 17;
-    const brakePower = 30;
-    const drag = 7;
+    const maxForward = gripCfg.maxForward * boost;
+    const maxReverse = -10;
+    const accel = gripCfg.accel;
+    const brakePower = gripCfg.brake;
+    const drag = gripCfg.drag;
 
     const wantsThrottle = keys.current.w;
     const wantsBrake = keys.current.s || keys.current.space;
@@ -161,7 +171,7 @@ function DrivePhysics({
 
     const speedAbs = Math.abs(velocity.current);
     const steerTarget = (keys.current.a ? 1 : 0) + (keys.current.d ? -1 : 0);
-    const grip = THREE.MathUtils.clamp(1 - speedAbs / 40, 0.36, 1);
+    const grip = THREE.MathUtils.clamp(1 - speedAbs / 44, gripCfg.gripFloor, 1);
     steer.current = THREE.MathUtils.lerp(steer.current, steerTarget * grip, 0.16);
 
     // Simple traction/slip model: aggressive throttle + steer at speed => more slip
@@ -191,9 +201,9 @@ function DrivePhysics({
     modelRef.current.position.x += rightX * lateral * dt;
     modelRef.current.position.z += rightZ * lateral * dt;
 
-    // short driveway boundaries
-    modelRef.current.position.x = THREE.MathUtils.clamp(modelRef.current.position.x, -4.6, 4.6);
-    modelRef.current.position.z = THREE.MathUtils.clamp(modelRef.current.position.z, -46, 46);
+    // free-roam world bounds (very wide, mostly unnoticeable)
+    modelRef.current.position.x = THREE.MathUtils.clamp(modelRef.current.position.x, -420, 420);
+    modelRef.current.position.z = THREE.MathUtils.clamp(modelRef.current.position.z, -420, 420);
 
     // suspension pitch + tiny bounce (bounce added to base height so car stays on road)
     const chassisBaseY = 0.42;
@@ -312,6 +322,43 @@ function CameraRig({ carRef, mode }: { carRef: MutableRefObject<THREE.Group | nu
   );
 }
 
+function OpenLandscape() {
+  const terrain = useMemo(() => {
+    const g = new THREE.PlaneGeometry(920, 920, 180, 180);
+    const p = g.attributes.position as THREE.BufferAttribute;
+
+    for (let i = 0; i < p.count; i++) {
+      const x = p.getX(i);
+      const y = p.getY(i);
+      const h = Math.sin(x * 0.03) * 1.1 + Math.cos(y * 0.022) * 0.9 + Math.sin((x + y) * 0.014) * 1.4;
+      p.setZ(i, h);
+    }
+
+    g.rotateX(-Math.PI / 2);
+    g.computeVertexNormals();
+    return g;
+  }, []);
+
+  return (
+    <group>
+      <mesh geometry={terrain} position={[0, -0.82, 0]} receiveShadow>
+        <meshStandardMaterial color="#5f7254" roughness={0.98} metalness={0.02} />
+      </mesh>
+
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.33, 0]} receiveShadow>
+        <planeGeometry args={[22, 860]} />
+        <meshStandardMaterial color="#34302e" roughness={0.98} metalness={0.01} />
+      </mesh>
+
+      {Array.from({ length: 95 }).map((_, i) => (
+        <mesh key={i} position={[0, -0.329, i * 9 - 425]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[0.25, 2.4]} />
+          <meshStandardMaterial color="#e8ecef" />
+        </mesh>
+      ))}
+    </group>
+  );
+}
 
 export function DriveSimulator() {
   const telemetryRef = useRef<Telemetry>({ speedKmh: 0, rpm: 900, braking: false, steer: 0, slip: 0, absActive: false });
@@ -323,6 +370,7 @@ export function DriveSimulator() {
   const [absActive, setAbsActive] = useState(false);
   const [gear, setGear] = useState<Gear>("D");
   const [mode, setMode] = useState<CameraMode>("chase");
+  const [gripMode, setGripMode] = useState<GripMode>("sport");
 
   useEffect(() => {
     const t = setInterval(() => {
@@ -336,6 +384,7 @@ export function DriveSimulator() {
 
   const gears = useMemo(() => ["P", "R", "N", "D"] as Gear[], []);
   const modes = useMemo(() => ["chase", "orbit", "top"] as CameraMode[], []);
+  const gripModes = useMemo(() => ["comfort", "sport", "track"] as GripMode[], []);
 
   return (
     <section className="relative h-screen bg-[#2f2927] text-white">
@@ -346,20 +395,9 @@ export function DriveSimulator() {
         <directionalLight position={[5, 8, 3]} intensity={2.4} color="#f0f6ff" castShadow />
         <pointLight position={[0, 2.6, -8]} color="#6dc6ff" intensity={10} distance={22} />
 
-        <DrivePhysics gear={gear} telemetryRef={telemetryRef} carRef={carRef} />
+        <DrivePhysics gear={gear} gripMode={gripMode} telemetryRef={telemetryRef} carRef={carRef} />
         <CameraRig carRef={carRef} mode={mode} />
-
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.35, 0]} receiveShadow>
-          <planeGeometry args={[12, 112]} />
-          <meshStandardMaterial color="#34302e" roughness={0.98} metalness={0.01} />
-        </mesh>
-
-        {Array.from({ length: 14 }).map((_, i) => (
-          <mesh key={i} position={[0, -0.339, i * 7.6 - 49]} rotation={[-Math.PI / 2, 0, 0]}>
-            <planeGeometry args={[0.22, 2.2]} />
-            <meshStandardMaterial color="#e8ecef" />
-          </mesh>
-        ))}
+        <OpenLandscape />
 
         <Environment preset="city" />
       </Canvas>
@@ -395,7 +433,7 @@ export function DriveSimulator() {
 
         <div className="rounded-2xl border border-white/20 bg-black/35 p-3 text-[11px] text-white/85">
           <p className="mb-1 text-[10px] tracking-[0.2em] text-white/60">DRIVE CONTROLS</p>
-          <p>W throttle · S brake · A/D steer</p>
+          <p>W/↑ throttle · S/↓ brake · A,D or ←,→ steer</p>
           <p>Space handbrake · Shift boost</p>
           <p className="mt-1 text-white/60">Mouse drag rotate, wheel zoom</p>
         </div>
@@ -410,6 +448,18 @@ export function DriveSimulator() {
                 className={`rounded-full px-2.5 py-1 text-[10px] capitalize ${mode === m ? "bg-white text-black" : "border border-white/30 text-white/85"}`}
               >
                 {m}
+              </button>
+            ))}
+          </div>
+          <p className="mb-1 mt-3 text-[10px] tracking-[0.2em] text-white/60">HANDLING</p>
+          <div className="flex gap-1.5">
+            {gripModes.map((g) => (
+              <button
+                key={g}
+                onClick={() => setGripMode(g)}
+                className={`rounded-full px-2.5 py-1 text-[10px] capitalize ${gripMode === g ? "bg-white text-black" : "border border-white/30 text-white/85"}`}
+              >
+                {g}
               </button>
             ))}
           </div>
