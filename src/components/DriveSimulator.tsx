@@ -141,19 +141,40 @@ function DrivePhysics({
     chassisRef.current.rotation.z = THREE.MathUtils.lerp(chassisRef.current.rotation.z, pitch, 0.1);
     chassisRef.current.position.y = THREE.MathUtils.lerp(chassisRef.current.position.y, bounce, 0.1);
 
-    // front wheel steering visuals
-    const steerAngle = THREE.MathUtils.clamp(steer.current * 0.48, -0.48, 0.48);
-    frontSteerRefs.current.forEach((g) => {
-      if (g) g.rotation.y = steerAngle;
-    });
+    // front wheel steering visuals (Ackermann-style inner/outer steering)
+    const steerBase = THREE.MathUtils.clamp(steer.current * 0.44, -0.44, 0.44);
+    const wheelBase = 2.04;
+    const trackWidth = 0.92;
 
-    // wheel spin
-    // More natural wheel roll rate (avoid hyper-fast 360-looking spin)
+    let leftSteer = steerBase;
+    let rightSteer = steerBase;
+
+    if (Math.abs(steerBase) > 0.02) {
+      const radius = wheelBase / Math.tan(Math.abs(steerBase));
+      const inner = Math.atan(wheelBase / Math.max(0.01, radius - trackWidth / 2));
+      const outer = Math.atan(wheelBase / (radius + trackWidth / 2));
+      if (steerBase > 0) {
+        leftSteer = inner;
+        rightSteer = outer;
+      } else {
+        leftSteer = -outer;
+        rightSteer = -inner;
+      }
+    }
+
+    // index0 is front-left (z -), index1 is front-right (z +)
+    if (frontSteerRefs.current[0]) frontSteerRefs.current[0].rotation.y = leftSteer;
+    if (frontSteerRefs.current[1]) frontSteerRefs.current[1].rotation.y = rightSteer;
+
+    // wheel roll: rotate only when moving enough to avoid fake spinning at near-zero speed
     const wheelRadius = 0.24;
-    const spin = (velocity.current / (wheelRadius * 2.4)) * dt;
-    wheelSpinRefs.current.forEach((w) => {
-      if (w) w.rotation.z -= spin;
-    });
+    const rolling = Math.abs(velocity.current) > 0.12;
+    if (rolling) {
+      const spin = (velocity.current / wheelRadius) * dt;
+      wheelSpinRefs.current.forEach((w) => {
+        if (w) w.rotation.z -= spin;
+      });
+    }
 
     const braking = wantsBrake;
     if (brakeLight.current) {
@@ -165,7 +186,7 @@ function DrivePhysics({
       speedKmh: Math.max(0, velocity.current * 3.6),
       rpm: THREE.MathUtils.clamp(850 + speedAbs * 230 + Math.abs(throttleInput.current) * 1250, 850, 7600),
       braking,
-      steer: steerAngle,
+      steer: (leftSteer + rightSteer) / 2,
     };
 
     carRef.current = modelRef.current;
