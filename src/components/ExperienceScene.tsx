@@ -2,17 +2,17 @@
 
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Environment, Float } from "@react-three/drei";
-import { useRef } from "react";
+import { Suspense, useRef } from "react";
 import * as THREE from "three";
 import { FerrariModel } from "./FerrariModel";
 
 type FocusKey = "power" | "battery" | "aero";
 
 const CAMERA_POINTS = [
-  { p: new THREE.Vector3(0, 1.0, 2.8), l: new THREE.Vector3(0, 0.35, 0) },
-  { p: new THREE.Vector3(-1.6, 1.05, 2.25), l: new THREE.Vector3(0, 0.42, 0) },
-  { p: new THREE.Vector3(1.7, 1.15, 2.1), l: new THREE.Vector3(0, 0.4, 0) },
-  { p: new THREE.Vector3(0, 1.7, 2.45), l: new THREE.Vector3(0, 0.48, 0) },
+  { p: new THREE.Vector3(0, 1.1, 4.6), l: new THREE.Vector3(0, 0.35, 0) },
+  { p: new THREE.Vector3(-2.1, 1.15, 3.8), l: new THREE.Vector3(0, 0.42, 0) },
+  { p: new THREE.Vector3(2.1, 1.2, 3.6), l: new THREE.Vector3(0, 0.4, 0) },
+  { p: new THREE.Vector3(0, 1.95, 4.0), l: new THREE.Vector3(0, 0.48, 0) },
 ];
 
 function GltfCar({ progress, reducedMotion }: { progress: number; reducedMotion: boolean }) {
@@ -26,8 +26,8 @@ function GltfCar({ progress, reducedMotion }: { progress: number; reducedMotion:
   });
 
   return (
-    <group ref={group} rotation-y={Math.PI} position={[0, 0.22, 0]}>
-      <FerrariModel targetLength={6.8} />
+    <group ref={group} rotation-y={Math.PI} position={[0, 0.2, 0]}>
+      <FerrariModel targetLength={3.8} />
     </group>
   );
 }
@@ -52,7 +52,7 @@ function CameraRig({ progress }: { progress: number }) {
 
 export function ExperienceScene({ progress, focus, reducedMotion }: { progress: number; focus: FocusKey; reducedMotion: boolean }) {
   return (
-    <Canvas dpr={[1, 1.6]} camera={{ position: [0, 1.0, 2.8], fov: 32 }}>
+    <Canvas dpr={[1, 1.6]} camera={{ position: [0, 1.1, 4.6], fov: 36 }}>
       <color attach="background" args={["#020308"]} />
       <fog attach="fog" args={["#020308", 7, 18]} />
       <ambientLight intensity={0.65} />
@@ -62,9 +62,11 @@ export function ExperienceScene({ progress, focus, reducedMotion }: { progress: 
 
       <CameraRig progress={progress} />
 
-      <Float speed={reducedMotion ? 0 : 1} rotationIntensity={0.06} floatIntensity={0.1}>
-        <GltfCar progress={progress} reducedMotion={reducedMotion} />
-      </Float>
+      <Suspense fallback={null}>
+        <Float speed={reducedMotion ? 0 : 1} rotationIntensity={0.06} floatIntensity={0.1}>
+          <GltfCar progress={progress} reducedMotion={reducedMotion} />
+        </Float>
+      </Suspense>
 
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.35, 0]}>
         <planeGeometry args={[100, 100]} />
