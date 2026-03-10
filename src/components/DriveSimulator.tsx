@@ -1,10 +1,11 @@
 "use client";
 
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Environment, OrbitControls, useGLTF } from "@react-three/drei";
+import { Environment, OrbitControls } from "@react-three/drei";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import * as THREE from "three";
+import { useFerrariModel } from "./FerrariModel";
 
 type Gear = "P" | "R" | "N" | "D";
 type CameraMode = "chase" | "orbit" | "top";
@@ -34,60 +35,7 @@ function DrivePhysics({
   const modelRef = useRef<THREE.Group>(null);
   const chassisRef = useRef<THREE.Group>(null);
   const brakeLight = useRef<THREE.Mesh>(null);
-  const wheelRefs = useRef<THREE.Object3D[]>([]);
-  const frontWheelRefs = useRef<THREE.Object3D[]>([]);
-  const gltf = useGLTF("https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/ferrari.glb");
-
-  const fittedCar = useMemo(() => {
-    const cloned = gltf.scene.clone(true);
-    const box = new THREE.Box3().setFromObject(cloned);
-    const size = box.getSize(new THREE.Vector3());
-    const center = box.getCenter(new THREE.Vector3());
-
-    // Recenter so camera/controls can reliably track the car body.
-    cloned.position.sub(center);
-
-    // Normalize car length to ~2.4 world units for consistent visibility.
-    const targetLength = 2.4;
-    const currentLength = Math.max(0.001, size.x);
-    const s = targetLength / currentLength;
-    cloned.scale.setScalar(s);
-
-    // Ferrari GLB wheel names (robust lookup from full scene graph)
-    const wheelFL = cloned.getObjectByName("wheel_fl");
-    const wheelFR = cloned.getObjectByName("wheel_fr");
-    const wheelRL = cloned.getObjectByName("wheel_rl");
-    const wheelRR = cloned.getObjectByName("wheel_rr");
-
-    const direct = [wheelFL, wheelFR, wheelRL, wheelRR].filter((w): w is THREE.Object3D => w != null);
-
-    if (direct.length === 4) {
-      wheelRefs.current = direct;
-      frontWheelRefs.current = [wheelFL, wheelFR].filter((w): w is THREE.Object3D => w != null);
-    } else {
-      const found: THREE.Object3D[] = [];
-      const front: THREE.Object3D[] = [];
-      cloned.traverse((obj) => {
-        const n = obj.name?.toLowerCase?.() ?? "";
-        if (n.includes("wheel")) {
-          found.push(obj);
-          if (n.includes("fl") || n.includes("fr") || n.includes("front")) front.push(obj);
-        }
-      });
-      wheelRefs.current = found;
-      frontWheelRefs.current = front;
-    }
-
-    cloned.traverse((obj) => {
-      const m = obj as THREE.Mesh;
-      if (m.isMesh) {
-        m.castShadow = true;
-        m.receiveShadow = true;
-      }
-    });
-
-    return cloned;
-  }, [gltf.scene]);
+  const { object: fittedCar, wheels, frontWheels } = useFerrariModel({ targetLength: 2.4 });
 
   const heading = useRef(0);
   const velocity = useRef(0);
@@ -217,7 +165,7 @@ function DrivePhysics({
     const rolling = Math.abs(velocity.current) > 0.08;
     if (rolling) {
       const spin = (velocity.current / wheelRadius) * dt;
-      wheelRefs.current.forEach((w) => {
+      wheels.forEach((w) => {
         if (!w) return;
         // most Ferrari exports roll on X; keep fallback for different rigs
         w.rotation.x -= spin;
@@ -225,7 +173,7 @@ function DrivePhysics({
     }
 
     const steerBase = THREE.MathUtils.clamp(steer.current * 0.44, -0.44, 0.44);
-    frontWheelRefs.current.forEach((w) => {
+    frontWheels.forEach((w) => {
       if (!w) return;
       w.rotation.y = steerBase;
     });
@@ -274,7 +222,7 @@ function DrivePhysics({
 }
 
 function CameraRig({ carRef, mode }: { carRef: MutableRefObject<THREE.Group | null>; mode: CameraMode }) {
-  const orbitRef = useRef<any>(null);
+  const orbitRef = useRef<{ target: THREE.Vector3; update: () => void } | null>(null);
   const { camera } = useThree();
 
   useFrame(() => {

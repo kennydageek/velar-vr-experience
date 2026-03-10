@@ -1,39 +1,15 @@
 "use client";
 
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Environment, Float, useGLTF } from "@react-three/drei";
-import { useMemo, useRef } from "react";
+import { Environment, Float } from "@react-three/drei";
+import { useRef } from "react";
 import * as THREE from "three";
+import { FerrariModel } from "./FerrariModel";
 
 type CarShellProps = { reducedMotion: boolean };
 
 function CarShell({ reducedMotion }: CarShellProps) {
   const group = useRef<THREE.Group>(null);
-  const gltf = useGLTF("https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/ferrari.glb");
-
-  const fittedCar = useMemo(() => {
-    const cloned = gltf.scene.clone(true);
-    const box = new THREE.Box3().setFromObject(cloned);
-    const size = box.getSize(new THREE.Vector3());
-    const center = box.getCenter(new THREE.Vector3());
-
-    cloned.position.sub(center);
-
-    const targetLength = 2.7;
-    const currentLength = Math.max(0.001, size.x);
-    const s = targetLength / currentLength;
-    cloned.scale.setScalar(s);
-
-    cloned.traverse((obj) => {
-      const m = obj as THREE.Mesh;
-      if (m.isMesh) {
-        m.castShadow = true;
-        m.receiveShadow = true;
-      }
-    });
-
-    return cloned;
-  }, [gltf.scene]);
 
   useFrame((state) => {
     if (!group.current || reducedMotion) return;
@@ -44,7 +20,7 @@ function CarShell({ reducedMotion }: CarShellProps) {
 
   return (
     <group ref={group} rotation-y={Math.PI} position={[0, 0.18, 0]}>
-      <primitive object={fittedCar} />
+      <FerrariModel targetLength={2.7} />
 
       <mesh position={[1.2, 0.27, 0]}>
         <boxGeometry args={[0.12, 0.03, 0.94]} />
