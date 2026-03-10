@@ -1,7 +1,7 @@
 "use client";
 
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Environment, OrbitControls } from "@react-three/drei";
+import { Environment, OrbitControls, useGLTF } from "@react-three/drei";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import * as THREE from "three";
@@ -19,27 +19,6 @@ type Telemetry = {
   absActive: boolean;
 };
 
-function Wheel({ wheelRef, steerRef }: { wheelRef?: (g: THREE.Group) => void; steerRef?: (g: THREE.Group) => void }) {
-  return (
-    <group ref={(g) => g && steerRef?.(g)}>
-      <group ref={(g) => g && wheelRef?.(g)}>
-        <mesh rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
-          <cylinderGeometry args={[0.24, 0.24, 0.16, 30]} />
-          <meshStandardMaterial color="#07090d" roughness={0.82} metalness={0.18} />
-        </mesh>
-        <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.145, 0.145, 0.17, 24]} />
-          <meshStandardMaterial color="#9ea6af" roughness={0.32} metalness={0.88} />
-        </mesh>
-        <mesh>
-          <torusGeometry args={[0.12, 0.01, 8, 24]} />
-          <meshStandardMaterial color="#dce3ea" metalness={0.95} roughness={0.2} />
-        </mesh>
-      </group>
-    </group>
-  );
-}
-
 function DrivePhysics({
   gear,
   telemetryRef,
@@ -52,9 +31,7 @@ function DrivePhysics({
   const modelRef = useRef<THREE.Group>(null);
   const chassisRef = useRef<THREE.Group>(null);
   const brakeLight = useRef<THREE.Mesh>(null);
-
-  const wheelSpinRefs = useRef<THREE.Group[]>([]);
-  const frontSteerRefs = useRef<THREE.Group[]>([]);
+  const gltf = useGLTF("https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/ferrari.glb");
 
   const heading = useRef(0);
   const velocity = useRef(0);
@@ -171,40 +148,7 @@ function DrivePhysics({
     chassisRef.current.rotation.z = THREE.MathUtils.lerp(chassisRef.current.rotation.z, pitch, 0.1);
     chassisRef.current.position.y = THREE.MathUtils.lerp(chassisRef.current.position.y, bounce, 0.1);
 
-    // front wheel steering visuals (Ackermann-style inner/outer steering)
     const steerBase = THREE.MathUtils.clamp(steer.current * 0.44, -0.44, 0.44);
-    const wheelBase = 2.04;
-    const trackWidth = 0.92;
-
-    let leftSteer = steerBase;
-    let rightSteer = steerBase;
-
-    if (Math.abs(steerBase) > 0.02) {
-      const radius = wheelBase / Math.tan(Math.abs(steerBase));
-      const inner = Math.atan(wheelBase / Math.max(0.01, radius - trackWidth / 2));
-      const outer = Math.atan(wheelBase / (radius + trackWidth / 2));
-      if (steerBase > 0) {
-        leftSteer = inner;
-        rightSteer = outer;
-      } else {
-        leftSteer = -outer;
-        rightSteer = -inner;
-      }
-    }
-
-    // index0 is front-left (z -), index1 is front-right (z +)
-    if (frontSteerRefs.current[0]) frontSteerRefs.current[0].rotation.y = leftSteer;
-    if (frontSteerRefs.current[1]) frontSteerRefs.current[1].rotation.y = rightSteer;
-
-    // wheel roll: rotate only when moving enough to avoid fake spinning at near-zero speed
-    const wheelRadius = 0.24;
-    const rolling = Math.abs(velocity.current) > 0.12;
-    if (rolling) {
-      const spin = (velocity.current / wheelRadius) * dt;
-      wheelSpinRefs.current.forEach((w) => {
-        if (w) w.rotation.z -= spin;
-      });
-    }
 
     const braking = wantsBrake;
     if (brakeLight.current) {
@@ -217,7 +161,7 @@ function DrivePhysics({
       speedKmh: Math.max(0, velocity.current * 3.6),
       rpm: THREE.MathUtils.clamp(850 + speedAbs * 230 + Math.abs(throttleInput.current) * 1250, 850, 7600),
       braking,
-      steer: (leftSteer + rightSteer) / 2,
+      steer: steerBase,
       slip: slipRef.current,
       absActive,
     };
@@ -227,46 +171,17 @@ function DrivePhysics({
 
   return (
     <group ref={modelRef}>
-      <group ref={chassisRef}>
-        <mesh position={[0, 0.27, 0]} scale={[2.75, 0.55, 1.08]} castShadow>
-          <boxGeometry args={[1, 1, 1]} />
-          <meshPhysicalMaterial color="#0d1117" metalness={0.9} roughness={0.2} clearcoat={1} clearcoatRoughness={0.08} />
-        </mesh>
-
-        <mesh position={[0, 0.68, 0]} scale={[1.44, 0.36, 0.9]} castShadow>
-          <boxGeometry args={[1, 1, 1]} />
-          <meshPhysicalMaterial color="#121823" metalness={0.7} roughness={0.27} />
-        </mesh>
-
-        <mesh position={[0, 0.72, 0]} scale={[1.14, 0.2, 0.74]}>
-          <boxGeometry args={[1, 1, 1]} />
-          <meshPhysicalMaterial color="#8fd7ff" transmission={0.85} roughness={0.03} thickness={0.2} transparent opacity={0.78} />
-        </mesh>
+      <group ref={chassisRef} scale={0.0175} position={[0, 0.12, 0]}>
+        <primitive object={gltf.scene} />
       </group>
 
-      <group position={[1.02, -0.03, -0.46]}>
-        <Wheel
-          steerRef={(g) => (frontSteerRefs.current[0] = g)}
-          wheelRef={(m) => (wheelSpinRefs.current[0] = m)}
-        />
-      </group>
-      <group position={[1.02, -0.03, 0.46]}>
-        <Wheel
-          steerRef={(g) => (frontSteerRefs.current[1] = g)}
-          wheelRef={(m) => (wheelSpinRefs.current[1] = m)}
-        />
-      </group>
-
-      <group position={[-1.02, -0.03, -0.46]}>
-        <Wheel wheelRef={(m) => (wheelSpinRefs.current[2] = m)} />
-      </group>
-      <group position={[-1.02, -0.03, 0.46]}>
-        <Wheel wheelRef={(m) => (wheelSpinRefs.current[3] = m)} />
-      </group>
-
-      <mesh position={[-1.2, 0.27, 0]}>
-        <boxGeometry args={[0.12, 0.03, 0.94]} />
-        <meshStandardMaterial color="#9cf2ff" emissive="#2ad8ff" emissiveIntensity={0.9} />
+      <mesh position={[-1.2, 0.31, 0.34]}>
+        <boxGeometry args={[0.06, 0.04, 0.12]} />
+        <meshStandardMaterial color="#d8f2ff" emissive="#8ad8ff" emissiveIntensity={1.8} />
+      </mesh>
+      <mesh position={[-1.2, 0.31, -0.34]}>
+        <boxGeometry args={[0.06, 0.04, 0.12]} />
+        <meshStandardMaterial color="#d8f2ff" emissive="#8ad8ff" emissiveIntensity={1.8} />
       </mesh>
 
       <mesh ref={brakeLight} position={[1.2, 0.27, 0]}>
@@ -432,3 +347,5 @@ export function DriveSimulator() {
     </section>
   );
 }
+
+useGLTF.preload("https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/ferrari.glb");
