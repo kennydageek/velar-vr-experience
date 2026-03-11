@@ -1,7 +1,7 @@
 'use client';
 
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Environment } from '@react-three/drei';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { Environment, OrbitControls } from '@react-three/drei';
 import Link from 'next/link';
 import {
   useEffect,
@@ -50,17 +50,25 @@ function n2(x: number, y: number) {
 function Car({
   gear,
   gripMode,
+  engineOn,
+  headlightsOn,
   telemetryRef,
   worldRef,
 }: {
   gear: Gear;
   gripMode: GripMode;
+  engineOn: boolean;
+  headlightsOn: boolean;
   telemetryRef: MutableRefObject<Telemetry>;
   worldRef: MutableRefObject<WorldState>;
 }) {
   const modelRef = useRef<THREE.Group>(null);
   const chassisRef = useRef<THREE.Group>(null);
   const brakeLight = useRef<THREE.Mesh>(null);
+  const headLightL = useRef<THREE.Mesh>(null);
+  const headLightR = useRef<THREE.Mesh>(null);
+  const signalL = useRef<THREE.Mesh>(null);
+  const signalR = useRef<THREE.Mesh>(null);
   const {
     object: fittedCar,
     wheels,
@@ -127,7 +135,7 @@ function Car({
     const maxForward = gripCfg.maxForward * boost;
     const maxReverse = -10;
 
-    const wantsThrottle = keys.current.w;
+    const wantsThrottle = engineOn && keys.current.w;
     const wantsBrake = keys.current.s || keys.current.space;
 
     let throttleTarget = 0;
@@ -146,6 +154,11 @@ function Car({
     );
 
     speed.current += throttleInput.current * gripCfg.accel * clampedDt;
+
+    if (!engineOn) {
+      speed.current *= 1 - Math.min(0.2, clampedDt * 4);
+      throttleInput.current = 0;
+    }
 
     const preBrakeSpeed = Math.abs(speed.current);
     const absActive = wantsBrake && preBrakeSpeed > 9;
@@ -237,6 +250,23 @@ function Car({
       m.emissiveIntensity = wantsBrake ? absBlink : 0.35;
     }
 
+    const blinkOn = Math.sin(performance.now() * 0.012) > 0;
+    if (signalL.current) {
+      const m = signalL.current.material as THREE.MeshStandardMaterial;
+      m.emissiveIntensity = steer.current > 0.15 && blinkOn ? 2.3 : 0.08;
+    }
+    if (signalR.current) {
+      const m = signalR.current.material as THREE.MeshStandardMaterial;
+      m.emissiveIntensity = steer.current < -0.15 && blinkOn ? 2.3 : 0.08;
+    }
+
+    if (headLightL.current && headLightR.current) {
+      const ml = headLightL.current.material as THREE.MeshStandardMaterial;
+      const mr = headLightR.current.material as THREE.MeshStandardMaterial;
+      ml.emissiveIntensity = headlightsOn ? 2.2 : 0.15;
+      mr.emissiveIntensity = headlightsOn ? 2.2 : 0.15;
+    }
+
     const accel = (speed.current - prevSpeed.current) / Math.max(0.0001, clampedDt);
     prevSpeed.current = speed.current;
 
@@ -266,6 +296,25 @@ function Car({
     <group ref={modelRef} position={[0, 0, 0]}>
       <group ref={chassisRef} position={[0, 0.42, 0]}>
         <primitive object={fittedCar} />
+
+        <mesh ref={headLightL} position={[-1.18, 0.31, 0.34]}>
+          <boxGeometry args={[0.06, 0.04, 0.12]} />
+          <meshStandardMaterial color="#f4fbff" emissive="#a7e4ff" emissiveIntensity={0.15} />
+        </mesh>
+        <mesh ref={headLightR} position={[-1.18, 0.31, -0.34]}>
+          <boxGeometry args={[0.06, 0.04, 0.12]} />
+          <meshStandardMaterial color="#f4fbff" emissive="#a7e4ff" emissiveIntensity={0.15} />
+        </mesh>
+
+        <mesh ref={signalL} position={[1.18, 0.29, 0.38]}>
+          <boxGeometry args={[0.05, 0.03, 0.09]} />
+          <meshStandardMaterial color="#ffcf7a" emissive="#ff9a1f" emissiveIntensity={0.08} />
+        </mesh>
+        <mesh ref={signalR} position={[1.18, 0.29, -0.38]}>
+          <boxGeometry args={[0.05, 0.03, 0.09]} />
+          <meshStandardMaterial color="#ffcf7a" emissive="#ff9a1f" emissiveIntensity={0.08} />
+        </mesh>
+
         <mesh ref={brakeLight} position={[1.2, 0.27, 0]}>
           <boxGeometry args={[0.12, 0.03, 0.94]} />
           <meshStandardMaterial
@@ -479,61 +528,6 @@ function DistantDepth({ worldRef }: { worldRef: MutableRefObject<WorldState> }) 
   );
 }
 
-function CameraController({
-  worldRef,
-}: {
-  worldRef: MutableRefObject<WorldState>;
-}) {
-  const { camera } = useThree();
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-
-  useEffect(() => {
-    cameraRef.current = camera as THREE.PerspectiveCamera;
-  }, [camera]);
-
-  const smoothSteer = useRef(0);
-  const smoothSpeed = useRef(0);
-  const smoothTilt = useRef(0);
-  const smoothPos = useRef(new THREE.Vector3(-2.8, 1.75, -3.4));
-  const smoothFov = useRef(52);
-
-  useFrame(() => {
-    if (!cameraRef.current) return;
-    const cam = cameraRef.current;
-
-    const { speed, steer } = worldRef.current;
-    const speedAbs = Math.abs(speed);
-
-    smoothSteer.current = THREE.MathUtils.lerp(smoothSteer.current, steer, 0.06);
-    smoothSpeed.current = THREE.MathUtils.lerp(smoothSpeed.current, speedAbs, 0.08);
-
-    const targetPos = new THREE.Vector3(
-      -2.8 - smoothSteer.current * 1.1,
-      1.75 + Math.min(smoothSpeed.current * 0.02, 0.7),
-      -3.4,
-    );
-    const lookAt = new THREE.Vector3(0, 0.55 + smoothSpeed.current * 0.005, 4.5);
-
-    smoothPos.current.lerp(targetPos, 0.08);
-    cam.position.copy(smoothPos.current);
-    cam.lookAt(lookAt);
-
-    const targetTilt = -smoothSteer.current * 0.05;
-    smoothTilt.current = THREE.MathUtils.lerp(smoothTilt.current, targetTilt, 0.06);
-    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
-    cam.quaternion.premultiply(
-      new THREE.Quaternion().setFromAxisAngle(forward, smoothTilt.current)
-    );
-
-    const targetFov = 52 + Math.min(smoothSpeed.current * 0.9, 12);
-    smoothFov.current = THREE.MathUtils.lerp(smoothFov.current, targetFov, 0.08);
-    cam.fov = smoothFov.current;
-    cam.updateProjectionMatrix();
-  });
-
-  return null;
-}
-
 function Sky({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
   const sunRef = useRef<THREE.DirectionalLight>(null);
   const particlesRef = useRef<THREE.Points>(null);
@@ -633,8 +627,10 @@ export function DriveSimulator() {
   const [rpm, setRpm] = useState(900);
   const [slip, setSlip] = useState(0);
   const [absActive, setAbsActive] = useState(false);
-  const [gear, setGear] = useState<Gear>('D');
+  const [gear, setGear] = useState<Gear>('P');
   const [gripMode, setGripMode] = useState<GripMode>('sport');
+  const [engineOn, setEngineOn] = useState(false);
+  const [headlightsOn, setHeadlightsOn] = useState(false);
 
   useEffect(() => {
     const t = setInterval(() => {
@@ -645,6 +641,36 @@ export function DriveSimulator() {
     }, 90);
     return () => clearInterval(t);
   }, []);
+
+  useEffect(() => {
+    if (!engineOn) return;
+
+    const AC = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AC) return;
+
+    const ctx = new AC();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sawtooth';
+    osc.frequency.value = 36;
+    gain.gain.value = 0.008;
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+
+    const id = window.setInterval(() => {
+      const target = 36 + Math.min(130, telemetryRef.current.rpm * 0.03);
+      osc.frequency.setTargetAtTime(target, ctx.currentTime, 0.08);
+    }, 120);
+
+    return () => {
+      window.clearInterval(id);
+      osc.stop();
+      ctx.close();
+    };
+  }, [engineOn, telemetryRef]);
 
   const gears = useMemo(() => ['P', 'R', 'N', 'D'] as Gear[], []);
   const gripModes = useMemo(
@@ -664,13 +690,15 @@ export function DriveSimulator() {
         <Car
           gear={gear}
           gripMode={gripMode}
+          engineOn={engineOn}
+          headlightsOn={headlightsOn}
           telemetryRef={telemetryRef}
           worldRef={worldRef}
         />
         <Sky worldRef={worldRef} />
         <Terrain worldRef={worldRef} />
         <DistantDepth worldRef={worldRef} />
-        <CameraController worldRef={worldRef} />
+        <OrbitControls makeDefault enablePan={false} minDistance={2.4} maxDistance={11} minPolarAngle={0.2} maxPolarAngle={1.45} target={[0,0.65,0]} />
 
         <Environment preset="sunset" />
       </Canvas>
@@ -722,17 +750,46 @@ export function DriveSimulator() {
           <p className="mb-1 text-[10px] tracking-[0.2em] text-white/60">
             DRIVE CONTROLS
           </p>
-          <p>W/↑ throttle · S/↓ brake · A,D or ←,→ steer</p>
-          <p>Space handbrake · Shift boost</p>
-          <p className="mt-1 text-white/60">
-            Terrain streams under the car (infinite-run illusion)
-          </p>
+          <p>Drag to orbit camera · scroll to zoom</p>
+          <p>Engine ON: W/↑ throttle · S/↓ brake · A,D or ←,→ steer</p>
+          <p className="mt-1 text-white/60">Car stays static until you start engine</p>
         </div>
 
         <div className="rounded-2xl border border-white/20 bg-black/35 p-3 text-[11px] text-white/85">
-          <p className="mb-1 text-[10px] tracking-[0.2em] text-white/60">
-            HANDLING
-          </p>
+          <p className="mb-1 text-[10px] tracking-[0.2em] text-white/60">VEHICLE</p>
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            <button
+              onClick={() => {
+                if (!engineOn) {
+                  setEngineOn(true);
+                  if (gear === 'P') setGear('D');
+                } else {
+                  setGear('P');
+                  setEngineOn(false);
+                }
+              }}
+              className={`rounded-full px-2.5 py-1 text-[10px] ${engineOn ? 'bg-emerald-300 text-black' : 'border border-white/30 text-white/85'}`}
+            >
+              {engineOn ? 'ENGINE ON' : 'START ENGINE'}
+            </button>
+            <button
+              onClick={() => setHeadlightsOn((v) => !v)}
+              className={`rounded-full px-2.5 py-1 text-[10px] ${headlightsOn ? 'bg-amber-200 text-black' : 'border border-white/30 text-white/85'}`}
+            >
+              {headlightsOn ? 'HEADLIGHTS ON' : 'HEADLIGHTS OFF'}
+            </button>
+            <button
+              onClick={() => {
+                setGear('P');
+                setEngineOn(false);
+              }}
+              className="rounded-full border border-white/30 px-2.5 py-1 text-[10px] text-white/85"
+            >
+              PARK + OFF
+            </button>
+          </div>
+
+          <p className="mb-1 text-[10px] tracking-[0.2em] text-white/60">HANDLING</p>
           <div className="flex gap-1.5">
             {gripModes.map((g) => (
               <button
