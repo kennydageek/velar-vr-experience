@@ -316,12 +316,10 @@ function Terrain({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
               geometry={tileGeom}
               receiveShadow
             >
-              <meshPhysicalMaterial
-                color="#16181c"
-                roughness={0.88}
-                metalness={0.08}
-                clearcoat={0.12}
-                clearcoatRoughness={0.75}
+              <meshStandardMaterial
+                color="#1a1a1c"
+                roughness={0.96}
+                metalness={0.02}
               />
             </mesh>
           );
