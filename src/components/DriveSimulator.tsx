@@ -311,14 +311,14 @@ function Car({
 }
 
 function Terrain({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
-  const tileSize = 120;
+  const tileSize = 140;
   const tileGeom = useMemo(() => {
     const g = new THREE.PlaneGeometry(tileSize, tileSize, 72, 72);
     const p = g.attributes.position as THREE.BufferAttribute;
     for (let i = 0; i < p.count; i++) {
       const x = p.getX(i);
       const y = p.getY(i);
-      const h = fbm(x, y) * 9.5;
+      const h = fbm(x, y) * 2.2;
       p.setZ(i, h);
     }
     g.rotateX(-Math.PI / 2);
@@ -346,8 +346,8 @@ function Terrain({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
     smoothZ.current += (zWrap - smoothZ.current) * lerpFactor;
 
     let idx = 0;
-    for (let ix = -1; ix <= 1; ix++) {
-      for (let iz = -1; iz <= 1; iz++) {
+    for (let ix = -2; ix <= 2; ix++) {
+      for (let iz = -2; iz <= 2; iz++) {
         const tile = tileRefs.current[idx++];
         if (!tile) continue;
         tile.position.set(ix * tileSize - xWrap, -1.15, iz * tileSize - zWrap);
@@ -391,9 +391,9 @@ function Terrain({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
 
   return (
     <group>
-      {[-1, 0, 1].flatMap((ix) =>
-        [-1, 0, 1].map((iz, innerIdx) => {
-          const index = (ix + 1) * 3 + innerIdx;
+      {[-2, -1, 0, 1, 2].flatMap((ix) =>
+        [-2, -1, 0, 1, 2].map((iz, innerIdx) => {
+          const index = (ix + 2) * 5 + innerIdx;
           return (
             <mesh
               key={`${ix}-${iz}`}
@@ -401,31 +401,17 @@ function Terrain({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
               geometry={tileGeom}
               receiveShadow
             >
-              <meshStandardMaterial
-                color="#1f242b"
-                roughness={0.9}
-                metalness={0.12}
+              <meshPhysicalMaterial
+                color="#2a2f37"
+                roughness={0.42}
+                metalness={0.36}
+                clearcoat={0.65}
+                clearcoatRoughness={0.18}
               />
             </mesh>
           );
         }),
       )}
-
-      <mesh
-        rotation={[-Math.PI / 2, 0, 0]}
-        position={[0, -0.39, 0]}
-        receiveShadow
-      >
-        <planeGeometry args={[18, 260]} />
-        <meshPhysicalMaterial
-          color="#29292d"
-          roughness={0.32}
-          metalness={0.25}
-          clearcoat={0.85}
-          clearcoatRoughness={0.12}
-        />
-      </mesh>
-
 
 
       <group ref={cloudRef} position={[0, 20, -70]}>
@@ -583,7 +569,7 @@ function Sky({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
 
   return (
     <>
-      <fog attach="fog" args={['#1f2634', 14, 150]} />
+      <fog attach="fog" args={['#242b35', 34, 260]} />
       <ambientLight intensity={0.45} />
       <hemisphereLight intensity={0.42} color="#b9d7ff" groundColor="#1c2330" />
       <directionalLight
