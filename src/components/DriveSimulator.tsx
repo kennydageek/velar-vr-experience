@@ -317,11 +317,11 @@ function Terrain({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
               receiveShadow
             >
               <meshPhysicalMaterial
-                color="#2a2f37"
-                roughness={0.42}
-                metalness={0.36}
-                clearcoat={0.65}
-                clearcoatRoughness={0.18}
+                color="#16181c"
+                roughness={0.88}
+                metalness={0.08}
+                clearcoat={0.12}
+                clearcoatRoughness={0.75}
               />
             </mesh>
           );
