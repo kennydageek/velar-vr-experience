@@ -333,6 +333,8 @@ function Terrain({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
 function DistantDepth({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
   const skylineRef = useRef<THREE.Group>(null);
   const glowRef = useRef<THREE.Points>(null);
+  const mountainsNearRef = useRef<THREE.Group>(null);
+  const mountainsFarRef = useRef<THREE.Group>(null);
 
   const glowGeo = useMemo(() => {
     const count = 160;
@@ -347,7 +349,7 @@ function DistantDepth({ worldRef }: { worldRef: MutableRefObject<WorldState> }) 
     return g;
   }, []);
 
-  useFrame((state) => {
+  useFrame(() => {
     const x = worldRef.current.offsetX;
     const z = worldRef.current.offsetZ;
 
@@ -359,24 +361,74 @@ function DistantDepth({ worldRef }: { worldRef: MutableRefObject<WorldState> }) 
     if (glowRef.current) {
       glowRef.current.position.x = -(x % 320) * 0.1;
       glowRef.current.position.z = -(z % 320) * 0.1 - 170;
-      const m = glowRef.current.material as THREE.PointsMaterial;
-      m.opacity = 0.26 + 0.12 * (0.5 + 0.5 * Math.sin(state.clock.elapsedTime * 0.65));
+    }
+
+    if (mountainsNearRef.current) {
+      mountainsNearRef.current.position.x = -(x % 400) * 0.06;
+      mountainsNearRef.current.position.z = -(z % 400) * 0.06 - 280;
+    }
+
+    if (mountainsFarRef.current) {
+      mountainsFarRef.current.position.x = -(x % 500) * 0.04;
+      mountainsFarRef.current.position.z = -(z % 500) * 0.04 - 380;
     }
   });
 
+  const mountainPeaks = useMemo(() => {
+    return Array.from({ length: 24 }).map((_, i) => ({
+      x: -280 + i * 26 + (n2(i * 1.1, 2) - 0.5) * 20,
+      height: 18 + n2(i * 0.7, 3) * 22,
+      radius: 22 + n2(i * 0.5, 4) * 16,
+    }));
+  }, []);
+
+  const mountainPeaksFar = useMemo(() => {
+    return Array.from({ length: 18 }).map((_, i) => ({
+      x: -260 + i * 34 + (n2(i * 1.3, 5) - 0.5) * 25,
+      height: 14 + n2(i * 0.9, 6) * 18,
+      radius: 28 + n2(i * 0.6, 7) * 20,
+    }));
+  }, []);
+
   return (
     <group>
+      <group ref={mountainsFarRef} position={[0, -2, -380]}>
+        {mountainPeaksFar.map((p, i) => (
+          <mesh key={`far-${i}`} position={[p.x, p.height * 0.5, 0]}>
+            <coneGeometry args={[p.radius, p.height, 5]} />
+            <meshStandardMaterial
+              color="#7d8fa3"
+              roughness={0.98}
+              metalness={0}
+            />
+          </mesh>
+        ))}
+      </group>
+
+      <group ref={mountainsNearRef} position={[0, -3, -280]}>
+        {mountainPeaks.map((p, i) => (
+          <mesh key={`near-${i}`} position={[p.x, p.height * 0.5, 0]}>
+            <coneGeometry args={[p.radius, p.height, 6]} />
+            <meshStandardMaterial
+              color="#5a6578"
+              roughness={0.95}
+              metalness={0.02}
+            />
+          </mesh>
+        ))}
+      </group>
+
       <group ref={skylineRef}>
         {Array.from({ length: 26 }).map((_, i) => (
           <mesh key={i} position={[-200 + i * 16, 7 + (i % 5) * 2.2, -50]}>
             <boxGeometry args={[8, 14 + (i % 6) * 4, 8]} />
-            <meshStandardMaterial color="#141820" roughness={0.88} metalness={0.12} />
+            <meshStandardMaterial color="#6b7a8a" roughness={0.85} metalness={0.08} />
           </mesh>
         ))}
       </group>
 
       <points ref={glowRef} geometry={glowGeo}>
-        <pointsMaterial color="#9ad7ff" size={1.4} transparent opacity={0.3} depthWrite={false} />
+        <pointsMaterial color="#fff5e0" size={0.9} transparent opacity={0.12} depthWrite={false} />
       </points>
     </group>
   );
@@ -472,7 +524,7 @@ function Sky({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
         16 + Math.sin(t * 0.2) * 2.8,
         Math.cos(dir + t * 0.03) * 20,
       );
-      sunRef.current.intensity = 2.3 + Math.sin(t * 0.3) * 0.25;
+      sunRef.current.intensity = 3.2 + Math.sin(t * 0.3) * 0.2;
     }
 
     if (particlesRef.current) {
@@ -487,27 +539,27 @@ function Sky({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
 
   return (
     <>
-      <ambientLight intensity={0.45} />
-      <hemisphereLight intensity={0.42} color="#b9d7ff" groundColor="#1c2330" />
+      <ambientLight intensity={0.7} />
+      <hemisphereLight intensity={0.6} color="#87ceeb" groundColor="#c4b8a8" />
       <directionalLight
         ref={sunRef}
         position={[10, 18, 8]}
-        intensity={2.4}
-        color="#dfe9ff"
+        intensity={3.2}
+        color="#fff5e6"
         castShadow
       />
       <pointLight
-        position={[0, 2.5, -5]}
-        color="#76c8ff"
-        intensity={8}
-        distance={32}
+        position={[0, 3, -5]}
+        color="#fff8f0"
+        intensity={2}
+        distance={40}
       />
       <points ref={particlesRef} geometry={particleGeo}>
         <pointsMaterial
-          color="#9fd8ff"
-          size={0.12}
+          color="#ffffff"
+          size={0.08}
           transparent
-          opacity={0.35}
+          opacity={0.15}
           depthWrite={false}
         />
       </points>
@@ -556,13 +608,13 @@ export function DriveSimulator() {
   );
 
   return (
-    <section className="relative h-screen bg-[#1a1f2c] text-white">
+    <section className="relative h-screen bg-[#87a8c4] text-white">
       <Canvas
         dpr={[1, 1.5]}
         camera={{ position: [-2.8, 1.75, -3.4], fov: 52 }}
         shadows
       >
-        <color attach="background" args={['#1a1f2c']} />
+        <color attach="background" args={['#87ceeb']} />
 
         <Car
           gear={gear}
@@ -575,7 +627,7 @@ export function DriveSimulator() {
         <DistantDepth worldRef={worldRef} />
         <CameraController worldRef={worldRef} />
 
-        <Environment preset="city" />
+        <Environment preset="sunset" />
       </Canvas>
 
       <div className="absolute left-0 top-0 flex w-full items-center justify-between px-6 py-6">
