@@ -326,15 +326,7 @@ function Terrain({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
     return g;
   }, []);
 
-  const treeGeom = useMemo(() => new THREE.ConeGeometry(0.35, 2.1, 6), []);
-  const treeMat = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: '#4d7b57', roughness: 0.92 }),
-    [],
-  );
-  const roadMarkGeom = useMemo(() => new THREE.PlaneGeometry(0.25, 2.6), []);
-
   const tileRefs = useRef<Array<THREE.Mesh | null>>([]);
-  const treeInstRef = useRef<THREE.InstancedMesh>(null);
   const cloudRef = useRef<THREE.Group>(null);
   const mountainNearRef = useRef<THREE.Group>(null);
   const mountainFarRef = useRef<THREE.Group>(null);
@@ -342,25 +334,7 @@ function Terrain({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
   const smoothX = useRef(0);
   const smoothZ = useRef(0);
 
-  const treeMatrices = useMemo(() => {
-    const m = new THREE.Matrix4();
-    const out: THREE.Matrix4[] = [];
-    for (let i = 0; i < 500; i++) {
-      const side = i % 2 === 0 ? -1 : 1;
-      const laneOffset = side * (9 + (i % 9));
-      const z = (Math.floor(i / 2) - 130) * 4.2;
-      const jitter = (n2(i * 0.21, i * 0.77) - 0.5) * 2.4;
-      m.makeTranslation(laneOffset + jitter, 0.8, z);
-      out.push(m.clone());
-    }
-    return out;
-  }, []);
 
-  useEffect(() => {
-    if (!treeInstRef.current) return;
-    treeMatrices.forEach((mx, i) => treeInstRef.current?.setMatrixAt(i, mx));
-    treeInstRef.current.instanceMatrix.needsUpdate = true;
-  }, [treeMatrices]);
 
   useFrame((state, dt) => {
     const { offsetX, offsetZ, speed } = worldRef.current;
@@ -428,9 +402,9 @@ function Terrain({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
               receiveShadow
             >
               <meshStandardMaterial
-                color="#5f7254"
-                roughness={0.98}
-                metalness={0.03}
+                color="#1f242b"
+                roughness={0.9}
+                metalness={0.12}
               />
             </mesh>
           );
@@ -452,27 +426,7 @@ function Terrain({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
         />
       </mesh>
 
-      {Array.from({ length: 42 }).map((_, i) => (
-        <mesh
-          key={i}
-          geometry={roadMarkGeom}
-          position={[0, -0.385, i * 6.4 - 134]}
-          rotation={[-Math.PI / 2, 0, 0]}
-        >
-          <meshStandardMaterial
-            color="#ecf1f5"
-            emissive="#d6e2ea"
-            emissiveIntensity={0.15}
-          />
-        </mesh>
-      ))}
 
-      <instancedMesh
-        ref={treeInstRef}
-        args={[treeGeom, treeMat, treeMatrices.length]}
-        castShadow
-        receiveShadow
-      />
 
       <group ref={cloudRef} position={[0, 20, -70]}>
         {Array.from({ length: 18 }).map((_, i) => (
