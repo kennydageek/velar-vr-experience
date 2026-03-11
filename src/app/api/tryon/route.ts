@@ -20,12 +20,28 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'personImage and garmentImage are required' }, { status: 400 });
     }
 
-    const version = process.env.TRYON_MODEL_VERSION;
+    const modelSlug = process.env.TRYON_MODEL ?? 'wavespeedai/virtual-try-on';
+    const [owner, name] = modelSlug.split('/');
+    if (!owner || !name) {
+      return NextResponse.json({ error: 'TRYON_MODEL must be in owner/name format' }, { status: 500 });
+    }
+
+    let version = process.env.TRYON_MODEL_VERSION;
     if (!version) {
-      return NextResponse.json(
-        { error: 'Missing TRYON_MODEL_VERSION env var (Replicate model version id)' },
-        { status: 500 },
-      );
+      const modelRes = await fetch(`https://api.replicate.com/v1/models/${owner}/${name}`, {
+        headers: { Authorization: `Token ${apiKey}` },
+      });
+
+      if (!modelRes.ok) {
+        const errText = await modelRes.text();
+        return NextResponse.json({ error: `Failed to fetch model details: ${errText}` }, { status: 502 });
+      }
+
+      const modelData = (await modelRes.json()) as { latest_version?: { id?: string } };
+      version = modelData.latest_version?.id;
+      if (!version) {
+        return NextResponse.json({ error: 'Could not resolve latest model version from Replicate' }, { status: 502 });
+      }
     }
 
     const createRes = await fetch('https://api.replicate.com/v1/predictions', {
