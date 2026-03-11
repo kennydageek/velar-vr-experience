@@ -1,6 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -145,7 +146,9 @@ export function EcommerceLanding() {
         <div className="grid gap-4 md:grid-cols-3">
           {products.map((p) => (
             <motion.article key={p.name} whileHover={{ y: -8 }} className={`rounded-2xl border p-5 ${t.card}`}>
-              <img src={p.image} alt={p.name} className="mb-4 h-36 w-full rounded-2xl object-cover" />
+              <div className="relative mb-4 h-36 w-full overflow-hidden rounded-2xl">
+                <Image src={p.image} alt={p.name} fill className="object-cover" sizes="(max-width: 768px) 100vw, 33vw" />
+              </div>
               <p className={`text-xs ${t.soft}`}>{p.category}</p>
               <h3 className="mt-1 text-lg font-semibold">{p.name}</h3>
               <p className={`mt-1 text-xs ${t.soft}`}>{p.tag}</p>
@@ -205,7 +208,9 @@ export function EcommerceLanding() {
       {activeProduct && (
         <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/55 p-4" onClick={() => setActiveProduct(null)}>
           <div className={`w-full max-w-xl rounded-3xl border p-5 ${t.card}`} onClick={(e) => e.stopPropagation()}>
-            <img src={activeProduct.image} alt={activeProduct.name} className="h-52 w-full rounded-2xl object-cover" />
+            <div className="relative h-52 w-full overflow-hidden rounded-2xl">
+              <Image src={activeProduct.image} alt={activeProduct.name} fill className="object-cover" sizes="(max-width: 768px) 100vw, 768px" />
+            </div>
             <p className={`mt-3 text-xs ${t.soft}`}>{activeProduct.category} · {activeProduct.tag}</p>
             <h3 className="mt-1 text-2xl font-semibold">{activeProduct.name}</h3>
             <p className={`mt-2 ${t.soft}`}>Premium dummy product for demo storefront interactions and quick-buy workflow.</p>
@@ -224,16 +229,19 @@ export function EcommerceLanding() {
 
       {tryOnSession && (
         <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/65 p-4" onClick={() => setTryOnSession(null)}>
-          <div className={`w-full max-w-2xl rounded-3xl border p-5 ${t.card}`} onClick={(e) => e.stopPropagation()}>
+          <div className={`w-full max-w-2xl rounded-3xl border p-5 ${theme === 'dark' ? 'border-white/15 bg-[#0b0f17]' : 'border-black/10 bg-white'}`} onClick={(e) => e.stopPropagation()}>
             <p className={`text-xs tracking-[0.2em] ${t.soft}`}>LIVE TRY-ON SESSION</p>
             <h3 className="mt-2 text-2xl font-semibold">{tryOnSession}</h3>
-            <div className={`mt-4 h-64 rounded-2xl border ${theme === 'dark' ? 'border-white/15 bg-black/40' : 'border-black/10 bg-white/90'} flex items-center justify-center`}>
-              <p className={`text-sm ${t.soft}`}>Camera preview simulated for demo · model alignment active</p>
+            <div className={`mt-4 h-64 rounded-2xl border ${theme === 'dark' ? 'border-cyan-300/25 bg-[#070b12]' : 'border-black/10 bg-white/90'} flex items-center justify-center`}>
+              <div className="text-center">
+                <p className={`text-sm ${t.soft}`}>Camera preview placeholder · model alignment active</p>
+                <p className={`mt-1 text-xs ${t.soft}`}>Grant camera access to enable real try-on rendering</p>
+              </div>
             </div>
             <div className="mt-4 flex gap-2">
               <button onClick={() => setNotice('Snapshot saved to fitting session')} className="rounded-full bg-cyan-500 px-4 py-2 text-sm font-semibold text-white">Capture Fit</button>
-              <button onClick={() => setNotice('Size recommendation generated')} className={`rounded-full border px-4 py-2 text-sm ${theme === 'dark' ? 'border-white/25' : 'border-black/20'}`}>Suggest Size</button>
-              <button onClick={() => setTryOnSession(null)} className={`rounded-full border px-4 py-2 text-sm ${theme === 'dark' ? 'border-white/25' : 'border-black/20'}`}>End Session</button>
+              <button onClick={() => setNotice('Size recommendation generated')} className={`rounded-full border px-4 py-2 text-sm ${theme === 'dark' ? 'border-white/25 bg-white/5' : 'border-black/20'}`}>Suggest Size</button>
+              <button onClick={() => setTryOnSession(null)} className={`rounded-full border px-4 py-2 text-sm ${theme === 'dark' ? 'border-white/25 bg-white/5' : 'border-black/20'}`}>End Session</button>
             </div>
           </div>
         </div>
