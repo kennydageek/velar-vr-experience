@@ -333,8 +333,11 @@ function Terrain({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
 function DistantDepth({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
   const skylineRef = useRef<THREE.Group>(null);
   const glowRef = useRef<THREE.Points>(null);
-  const mountainsNearRef = useRef<THREE.Group>(null);
-  const mountainsFarRef = useRef<THREE.Group>(null);
+  const mountainsNearFrontRef = useRef<THREE.Group>(null);
+  const mountainsFarFrontRef = useRef<THREE.Group>(null);
+  const mountainsNearBackRef = useRef<THREE.Group>(null);
+  const mountainsSideLeftRef = useRef<THREE.Group>(null);
+  const mountainsSideRightRef = useRef<THREE.Group>(null);
 
   const glowGeo = useMemo(() => {
     const count = 160;
@@ -363,14 +366,29 @@ function DistantDepth({ worldRef }: { worldRef: MutableRefObject<WorldState> }) 
       glowRef.current.position.z = -(z % 320) * 0.1 - 170;
     }
 
-    if (mountainsNearRef.current) {
-      mountainsNearRef.current.position.x = -(x % 400) * 0.06;
-      mountainsNearRef.current.position.z = -(z % 400) * 0.06 - 280;
+    if (mountainsNearFrontRef.current) {
+      mountainsNearFrontRef.current.position.x = -(x % 400) * 0.06;
+      mountainsNearFrontRef.current.position.z = -(z % 400) * 0.06 - 280;
     }
 
-    if (mountainsFarRef.current) {
-      mountainsFarRef.current.position.x = -(x % 500) * 0.04;
-      mountainsFarRef.current.position.z = -(z % 500) * 0.04 - 380;
+    if (mountainsFarFrontRef.current) {
+      mountainsFarFrontRef.current.position.x = -(x % 500) * 0.04;
+      mountainsFarFrontRef.current.position.z = -(z % 500) * 0.04 - 380;
+    }
+
+    if (mountainsNearBackRef.current) {
+      mountainsNearBackRef.current.position.x = -(x % 420) * 0.06;
+      mountainsNearBackRef.current.position.z = -(z % 420) * 0.06 + 280;
+    }
+
+    if (mountainsSideLeftRef.current) {
+      mountainsSideLeftRef.current.position.x = -(x % 420) * 0.06 - 300;
+      mountainsSideLeftRef.current.position.z = -(z % 420) * 0.06;
+    }
+
+    if (mountainsSideRightRef.current) {
+      mountainsSideRightRef.current.position.x = -(x % 420) * 0.06 + 300;
+      mountainsSideRightRef.current.position.z = -(z % 420) * 0.06;
     }
   });
 
@@ -392,10 +410,10 @@ function DistantDepth({ worldRef }: { worldRef: MutableRefObject<WorldState> }) 
 
   return (
     <group>
-      <group ref={mountainsFarRef} position={[0, -2, -380]}>
+      <group ref={mountainsFarFrontRef} position={[0, -2, -380]}>
         {mountainPeaksFar.map((p, i) => (
-          <mesh key={`far-${i}`} position={[p.x, p.height * 0.5, 0]}>
-            <coneGeometry args={[p.radius, p.height, 5]} />
+          <mesh key={`far-front-${i}`} position={[p.x, p.height * 0.6, 0]}>
+            <coneGeometry args={[p.radius * 1.15, p.height * 1.25, 5]} />
             <meshStandardMaterial
               color="#7d8fa3"
               roughness={0.98}
@@ -405,15 +423,42 @@ function DistantDepth({ worldRef }: { worldRef: MutableRefObject<WorldState> }) 
         ))}
       </group>
 
-      <group ref={mountainsNearRef} position={[0, -3, -280]}>
+      <group ref={mountainsNearFrontRef} position={[0, -3, -280]}>
         {mountainPeaks.map((p, i) => (
-          <mesh key={`near-${i}`} position={[p.x, p.height * 0.5, 0]}>
-            <coneGeometry args={[p.radius, p.height, 6]} />
+          <mesh key={`near-front-${i}`} position={[p.x, p.height * 0.6, 0]}>
+            <coneGeometry args={[p.radius * 1.2, p.height * 1.3, 6]} />
             <meshStandardMaterial
               color="#5a6578"
               roughness={0.95}
               metalness={0.02}
             />
+          </mesh>
+        ))}
+      </group>
+
+      <group ref={mountainsNearBackRef} position={[0, -3, 280]} rotation-y={Math.PI}>
+        {mountainPeaks.map((p, i) => (
+          <mesh key={`near-back-${i}`} position={[p.x, p.height * 0.55, 0]}>
+            <coneGeometry args={[p.radius * 1.05, p.height * 1.15, 6]} />
+            <meshStandardMaterial color="#667387" roughness={0.96} metalness={0.01} />
+          </mesh>
+        ))}
+      </group>
+
+      <group ref={mountainsSideLeftRef} position={[-300, -3, 0]} rotation-y={Math.PI / 2}>
+        {mountainPeaks.map((p, i) => (
+          <mesh key={`side-left-${i}`} position={[p.x, p.height * 0.5, 0]}>
+            <coneGeometry args={[p.radius, p.height * 1.1, 6]} />
+            <meshStandardMaterial color="#6c7a8f" roughness={0.97} metalness={0.01} />
+          </mesh>
+        ))}
+      </group>
+
+      <group ref={mountainsSideRightRef} position={[300, -3, 0]} rotation-y={-Math.PI / 2}>
+        {mountainPeaks.map((p, i) => (
+          <mesh key={`side-right-${i}`} position={[p.x, p.height * 0.5, 0]}>
+            <coneGeometry args={[p.radius, p.height * 1.1, 6]} />
+            <meshStandardMaterial color="#6c7a8f" roughness={0.97} metalness={0.01} />
           </mesh>
         ))}
       </group>
