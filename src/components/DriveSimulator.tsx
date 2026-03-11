@@ -365,10 +365,12 @@ function Terrain({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
               geometry={tileGeom}
               receiveShadow
             >
-              <meshStandardMaterial
-                color="#6b7482"
-                roughness={0.9}
-                metalness={0.04}
+              <meshPhysicalMaterial
+                color="#717a87"
+                roughness={0.78}
+                metalness={0.06}
+                clearcoat={0.18}
+                clearcoatRoughness={0.62}
               />
             </mesh>
           );
@@ -630,6 +632,7 @@ export function DriveSimulator() {
   const [gear, setGear] = useState<Gear>('P');
   const [gripMode, setGripMode] = useState<GripMode>('sport');
   const [engineOn, setEngineOn] = useState(false);
+  const [engineState, setEngineState] = useState<'off' | 'starting' | 'running' | 'stopping'>('off');
   const [headlightsOn, setHeadlightsOn] = useState(false);
 
   useEffect(() => {
@@ -649,25 +652,59 @@ export function DriveSimulator() {
     if (!AC) return;
 
     const ctx = new AC();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
 
-    osc.type = 'sawtooth';
-    osc.frequency.value = 36;
-    gain.gain.value = 0.008;
+    const idleOsc = ctx.createOscillator();
+    const revOsc = ctx.createOscillator();
+    const rumbleOsc = ctx.createOscillator();
 
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
+    const idleGain = ctx.createGain();
+    const revGain = ctx.createGain();
+    const rumbleGain = ctx.createGain();
+    const masterGain = ctx.createGain();
+
+    idleOsc.type = 'triangle';
+    revOsc.type = 'sawtooth';
+    rumbleOsc.type = 'sine';
+
+    idleOsc.frequency.value = 32;
+    revOsc.frequency.value = 68;
+    rumbleOsc.frequency.value = 22;
+
+    idleGain.gain.value = 0.005;
+    revGain.gain.value = 0.002;
+    rumbleGain.gain.value = 0.003;
+    masterGain.gain.value = 0.65;
+
+    idleOsc.connect(idleGain);
+    revOsc.connect(revGain);
+    rumbleOsc.connect(rumbleGain);
+    idleGain.connect(masterGain);
+    revGain.connect(masterGain);
+    rumbleGain.connect(masterGain);
+    masterGain.connect(ctx.destination);
+
+    idleOsc.start();
+    revOsc.start();
+    rumbleOsc.start();
 
     const id = window.setInterval(() => {
-      const target = 36 + Math.min(130, telemetryRef.current.rpm * 0.03);
-      osc.frequency.setTargetAtTime(target, ctx.currentTime, 0.08);
-    }, 120);
+      const rpmNow = telemetryRef.current.rpm;
+      const speedNow = telemetryRef.current.speedKmh;
+      const t = Math.min(1, (rpmNow - 850) / 5200);
+
+      idleOsc.frequency.setTargetAtTime(30 + t * 18, ctx.currentTime, 0.07);
+      revOsc.frequency.setTargetAtTime(62 + t * 180 + speedNow * 0.08, ctx.currentTime, 0.06);
+      rumbleOsc.frequency.setTargetAtTime(18 + t * 16, ctx.currentTime, 0.09);
+
+      revGain.gain.setTargetAtTime(0.0015 + t * 0.006, ctx.currentTime, 0.08);
+      idleGain.gain.setTargetAtTime(0.006 - t * 0.002, ctx.currentTime, 0.08);
+    }, 90);
 
     return () => {
       window.clearInterval(id);
-      osc.stop();
+      idleOsc.stop();
+      revOsc.stop();
+      rumbleOsc.stop();
       ctx.close();
     };
   }, [engineOn, telemetryRef]);
@@ -677,6 +714,26 @@ export function DriveSimulator() {
     () => ['comfort', 'sport', 'track'] as GripMode[],
     [],
   );
+
+  const startEngine = () => {
+    if (engineState === 'starting' || engineState === 'stopping' || engineOn) return;
+    setEngineState('starting');
+    window.setTimeout(() => {
+      setEngineOn(true);
+      setEngineState('running');
+      if (gear === 'P') setGear('D');
+    }, 900);
+  };
+
+  const stopEngine = () => {
+    if (engineState === 'starting' || engineState === 'stopping' || !engineOn) return;
+    setEngineState('stopping');
+    window.setTimeout(() => {
+      setGear('P');
+      setEngineOn(false);
+      setEngineState('off');
+    }, 700);
+  };
 
   return (
     <section className="relative h-screen bg-[#87a8c4] text-white">
@@ -757,35 +814,29 @@ export function DriveSimulator() {
 
         <div className="rounded-2xl border border-white/20 bg-black/35 p-3 text-[11px] text-white/85">
           <p className="mb-1 text-[10px] tracking-[0.2em] text-white/60">VEHICLE</p>
+          <p className="mb-2 text-[10px] text-white/70">
+            Engine: {engineState.toUpperCase()} · Lights: {headlightsOn ? 'ON' : 'OFF'}
+          </p>
           <div className="mb-2 flex flex-wrap gap-1.5">
             <button
-              onClick={() => {
-                if (!engineOn) {
-                  setEngineOn(true);
-                  if (gear === 'P') setGear('D');
-                } else {
-                  setGear('P');
-                  setEngineOn(false);
-                }
-              }}
-              className={`rounded-full px-2.5 py-1 text-[10px] ${engineOn ? 'bg-emerald-300 text-black' : 'border border-white/30 text-white/85'}`}
+              onClick={startEngine}
+              disabled={engineState === 'starting' || engineState === 'stopping' || engineOn}
+              className={`rounded-full px-2.5 py-1 text-[10px] ${engineOn ? 'bg-emerald-300 text-black' : 'border border-white/30 text-white/85'} disabled:opacity-50`}
             >
-              {engineOn ? 'ENGINE ON' : 'START ENGINE'}
+              {engineState === 'starting' ? 'STARTING…' : engineOn ? 'ENGINE ON' : 'START ENGINE'}
+            </button>
+            <button
+              onClick={stopEngine}
+              disabled={!engineOn || engineState === 'starting' || engineState === 'stopping'}
+              className="rounded-full border border-white/30 px-2.5 py-1 text-[10px] text-white/85 disabled:opacity-50"
+            >
+              {engineState === 'stopping' ? 'SHUTTING…' : 'PARK + OFF'}
             </button>
             <button
               onClick={() => setHeadlightsOn((v) => !v)}
               className={`rounded-full px-2.5 py-1 text-[10px] ${headlightsOn ? 'bg-amber-200 text-black' : 'border border-white/30 text-white/85'}`}
             >
               {headlightsOn ? 'HEADLIGHTS ON' : 'HEADLIGHTS OFF'}
-            </button>
-            <button
-              onClick={() => {
-                setGear('P');
-                setEngineOn(false);
-              }}
-              className="rounded-full border border-white/30 px-2.5 py-1 text-[10px] text-white/85"
-            >
-              PARK + OFF
             </button>
           </div>
 
