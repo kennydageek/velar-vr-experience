@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { Terrain } from './Terrain';
 import { EnvironmentEffects } from './EnvironmentEffects';
 import { ParallaxMountains } from './ParallaxMountains';
-import { RoadsideElements } from './RoadsideElements';
+
 
 type WorldProps = {
   worldOffsetRef: React.MutableRefObject<THREE.Vector3>;
@@ -25,7 +25,6 @@ export function World({ worldOffsetRef }: WorldProps) {
     <group ref={groupRef}>
       <Terrain worldOffset={worldOffsetRef} />
       <ParallaxMountains worldOffset={worldOffsetRef} />
-      <RoadsideElements />
       <EnvironmentEffects worldOffset={worldOffsetRef} />
     </group>
   );

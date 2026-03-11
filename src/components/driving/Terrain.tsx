@@ -1,6 +1,5 @@
 'use client';
 
-import { useFrame } from '@react-three/fiber';
 import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { fbm } from '@/lib/noise';
@@ -8,7 +7,7 @@ import { fbm } from '@/lib/noise';
 const TERRAIN_SIZE = 600;
 const TERRAIN_SEGMENTS = 128;
 const HEIGHT_SCALE = 12;
-const ROAD_WIDTH = 14;
+
 
 type TerrainProps = {
   worldOffset: React.MutableRefObject<THREE.Vector3>;
@@ -40,9 +39,8 @@ function createTerrainGeometry(
   return g;
 }
 
-export function Terrain({ worldOffset }: TerrainProps) {
+export function Terrain({}: TerrainProps) {
   const meshRef = useRef<THREE.Mesh>(null);
-  const roadRef = useRef<THREE.Mesh>(null);
   const geometry = useMemo(
     () =>
       createTerrainGeometry(
@@ -55,11 +53,6 @@ export function Terrain({ worldOffset }: TerrainProps) {
     []
   );
 
-  const roadGeometry = useMemo(() => {
-    const g = new THREE.PlaneGeometry(TERRAIN_SIZE + 100, ROAD_WIDTH, 1, 1);
-    g.rotateX(-Math.PI / 2);
-    return g;
-  }, []);
 
   return (
     <group>
@@ -71,23 +64,10 @@ export function Terrain({ worldOffset }: TerrainProps) {
         frustumCulled
       >
         <meshStandardMaterial
-          color="#2a3d2e"
-          roughness={0.92}
-          metalness={0.04}
-          envMapIntensity={0.3}
-        />
-      </mesh>
-      <mesh
-        ref={roadRef}
-        geometry={roadGeometry}
-        position={[0, 0.02, 0]}
-        rotation={[0, 0, 0]}
-        receiveShadow
-      >
-        <meshStandardMaterial
-          color="#1a1d1f"
-          roughness={0.85}
-          metalness={0.08}
+          color="#191d23"
+          roughness={0.86}
+          metalness={0.12}
+          envMapIntensity={0.45}
         />
       </mesh>
     </group>
@@ -95,7 +75,7 @@ export function Terrain({ worldOffset }: TerrainProps) {
 }
 
 /** Low-detail distant terrain for LOD level 1 */
-export function TerrainLODFar({ worldOffset }: TerrainProps) {
+export function TerrainLODFar({}: TerrainProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const geometry = useMemo(
     () =>
@@ -112,9 +92,9 @@ export function TerrainLODFar({ worldOffset }: TerrainProps) {
   return (
     <mesh ref={meshRef} geometry={geometry} position={[0, 0, 0]} frustumCulled>
       <meshStandardMaterial
-        color="#223328"
-        roughness={0.95}
-        metalness={0.02}
+        color="#171b21"
+        roughness={0.92}
+        metalness={0.06}
         fog={true}
       />
     </mesh>

@@ -1,6 +1,5 @@
 'use client';
 
-import { useFrame } from '@react-three/fiber';
 import { useRef } from 'react';
 import * as THREE from 'three';
 
@@ -8,7 +7,7 @@ type ReflectiveGroundProps = {
   worldOffsetRef: React.MutableRefObject<THREE.Vector3>;
 };
 
-export function ReflectiveGround({ worldOffsetRef }: ReflectiveGroundProps) {
+export function ReflectiveGround({}: ReflectiveGroundProps) {
   const meshRef = useRef<THREE.Mesh>(null);
 
   return (
@@ -19,7 +18,7 @@ export function ReflectiveGround({ worldOffsetRef }: ReflectiveGroundProps) {
         position={[0, 0.01, 0]}
         receiveShadow
       >
-        <planeGeometry args={[20, 20]} />
+        <planeGeometry args={[160, 160]} />
         <meshStandardMaterial
           color="#1a1f22"
           roughness={0.35}
