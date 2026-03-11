@@ -7,9 +7,12 @@ import { useMemo, useState } from 'react';
 type ThemeMode = 'light' | 'dark';
 
 const products = [
-  { name: 'Aether Runner', price: '$149', tag: 'New', hue: 'from-cyan-400 to-blue-600' },
-  { name: 'Nova Jacket', price: '$219', tag: 'Best Seller', hue: 'from-fuchsia-400 to-violet-600' },
-  { name: 'Flux Headset', price: '$179', tag: 'Limited', hue: 'from-amber-400 to-orange-600' },
+  { name: 'Aether Runner', price: '$149', oldPrice: '$189', tag: 'New', hue: 'from-cyan-400 to-blue-600', category: 'Sneakers' },
+  { name: 'Nova Jacket', price: '$219', oldPrice: '$269', tag: 'Best Seller', hue: 'from-fuchsia-400 to-violet-600', category: 'Outerwear' },
+  { name: 'Flux Headset', price: '$179', oldPrice: '$229', tag: 'Limited', hue: 'from-amber-400 to-orange-600', category: 'Audio' },
+  { name: 'Orbit Glasses', price: '$129', oldPrice: '$159', tag: 'Trending', hue: 'from-emerald-400 to-teal-600', category: 'Wearables' },
+  { name: 'Pulse Hoodie', price: '$99', oldPrice: '$129', tag: 'Sale', hue: 'from-rose-400 to-pink-600', category: 'Apparel' },
+  { name: 'Neo Watch', price: '$249', oldPrice: '$299', tag: 'Premium', hue: 'from-indigo-400 to-blue-700', category: 'Accessories' },
 ];
 
 export function EcommerceLanding() {
@@ -82,7 +85,7 @@ export function EcommerceLanding() {
           <div className="absolute -bottom-12 -left-12 h-40 w-40 rounded-full bg-violet-400/20 blur-3xl" />
 
           <div className="relative space-y-5">
-            {products.map((p, i) => (
+            {products.slice(0, 3).map((p, i) => (
               <motion.div
                 key={p.name}
                 className={`rounded-2xl border p-4 ${theme === 'dark' ? 'border-white/10 bg-black/30' : 'border-black/10 bg-white/90'}`}
@@ -95,15 +98,64 @@ export function EcommerceLanding() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-semibold">{p.name}</p>
-                    <p className={`text-xs ${t.soft}`}>{p.tag}</p>
+                    <p className={`text-xs ${t.soft}`}>{p.tag} · {p.category}</p>
                   </div>
                   <div className={`h-10 w-10 rounded-xl bg-gradient-to-br ${p.hue}`} />
                 </div>
                 <div className="mt-3 flex items-center justify-between">
-                  <p className="text-sm font-medium">{p.price}</p>
+                  <p className="text-sm font-medium">{p.price} <span className={`ml-1 text-xs line-through ${t.soft}`}>{p.oldPrice}</span></p>
                   <button className="rounded-full bg-cyan-500 px-3 py-1 text-[11px] font-semibold text-white">ADD</button>
                 </div>
               </motion.div>
+            ))}
+          </div>
+        </motion.div>
+      </section>
+
+      <section className="relative z-10 mx-auto max-w-7xl px-6 pb-8 md:px-10">
+        <div className="mb-4 flex items-end justify-between">
+          <div>
+            <p className={`text-xs tracking-[0.25em] ${t.soft}`}>DUMMY PRODUCT CATALOG</p>
+            <h2 className="mt-1 text-2xl font-semibold md:text-4xl">Featured Products + Pricing</h2>
+          </div>
+          <button className={`rounded-full border px-4 py-2 text-xs ${theme === 'dark' ? 'border-white/25' : 'border-black/20'}`}>View All</button>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          {products.map((p) => (
+            <motion.article key={p.name} whileHover={{ y: -8 }} className={`rounded-2xl border p-5 ${t.card}`}>
+              <div className={`mb-4 h-36 rounded-2xl bg-gradient-to-br ${p.hue}`} />
+              <p className={`text-xs ${t.soft}`}>{p.category}</p>
+              <h3 className="mt-1 text-lg font-semibold">{p.name}</h3>
+              <p className={`mt-1 text-xs ${t.soft}`}>{p.tag}</p>
+              <div className="mt-3 flex items-center gap-2">
+                <p className="text-lg font-semibold">{p.price}</p>
+                <p className={`text-sm line-through ${t.soft}`}>{p.oldPrice}</p>
+              </div>
+              <div className="mt-4 flex gap-2">
+                <button className="rounded-full bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-white">Add to Cart</button>
+                <button className={`rounded-full border px-3 py-1.5 text-xs ${theme === 'dark' ? 'border-white/25' : 'border-black/20'}`}>Quick View</button>
+              </div>
+            </motion.article>
+          ))}
+        </div>
+      </section>
+
+      <section className="relative z-10 mx-auto max-w-7xl px-6 pb-10 md:px-10">
+        <motion.div whileHover={{ y: -4 }} className={`rounded-3xl border p-6 md:p-8 ${t.card}`}>
+          <p className={`text-xs tracking-[0.25em] ${t.soft}`}>VIRTUAL TRY-ON</p>
+          <h3 className="mt-2 text-2xl font-semibold md:text-4xl">Try products live before checkout</h3>
+          <p className={`mt-3 max-w-2xl text-sm ${t.soft}`}>
+            Simulate fitting for glasses, sneakers, and jackets with camera-assisted overlays and size previews.
+            This demo uses dummy products with realistic pricing + virtual try-on CTA flow.
+          </p>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
+            {['Try Glasses in AR', 'Try Sneakers On-Foot', 'Try Jacket on Avatar'].map((label, i) => (
+              <button key={label} className={`rounded-2xl border p-4 text-left transition hover:scale-[1.02] ${theme === 'dark' ? 'border-white/15 bg-black/30' : 'border-black/10 bg-white/90'}`}>
+                <p className="text-sm font-semibold">{label}</p>
+                <p className={`mt-1 text-xs ${t.soft}`}>Session {i + 1} · Ready</p>
+              </button>
             ))}
           </div>
         </motion.div>
