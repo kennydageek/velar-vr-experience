@@ -29,6 +29,8 @@ export function EcommerceLanding() {
   const [overlayScale, setOverlayScale] = useState(1);
   const [overlayRotation, setOverlayRotation] = useState(0);
   const [cameraOn, setCameraOn] = useState(false);
+  const [isGeneratingTryOn, setIsGeneratingTryOn] = useState(false);
+  const [generatedTryOn, setGeneratedTryOn] = useState<string | null>(null);
   const [notice, setNotice] = useState<string>('');
   const tryOnInputRef = useRef<HTMLInputElement | null>(null);
   const tryOnVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -75,6 +77,7 @@ export function EcommerceLanding() {
   const openTryOn = (label: string, product?: (typeof products)[number]) => {
     setTryOnSession(label);
     setTryOnProduct(product ?? products[0]);
+    setGeneratedTryOn(null);
     setOverlayX(0);
     setOverlayY(0);
     setOverlayScale(1);
@@ -230,6 +233,51 @@ export function EcommerceLanding() {
   const closeTryOn = () => {
     stopLiveCamera();
     setTryOnSession(null);
+    setGeneratedTryOn(null);
+  };
+
+  const generateTryOn = async () => {
+    if (!tryOnProduct) {
+      setNotice('Select a product first.');
+      return;
+    }
+
+    let baseSource = tryOnImage;
+    if (!baseSource && cameraOn && tryOnVideoRef.current) {
+      baseSource = await captureFromCamera();
+    }
+
+    if (!baseSource) {
+      setNotice('Upload image or start camera first.');
+      return;
+    }
+
+    try {
+      setIsGeneratingTryOn(true);
+      setNotice('Generating try-on result...');
+
+      const res = await fetch('/api/tryon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          personImage: baseSource,
+          garmentImage: tryOnProduct.image,
+        }),
+      });
+
+      const data = (await res.json()) as { image?: string; error?: string };
+      if (!res.ok || !data.image) {
+        setNotice(data.error ?? 'Try-on generation failed');
+        return;
+      }
+
+      setGeneratedTryOn(data.image);
+      setNotice('Try-on generated successfully.');
+    } catch {
+      setNotice('Failed to generate try-on.');
+    } finally {
+      setIsGeneratingTryOn(false);
+    }
   };
 
   const saveTryOnResult = async () => {
@@ -238,7 +286,7 @@ export function EcommerceLanding() {
       return;
     }
 
-    let baseSource = tryOnImage;
+    let baseSource = generatedTryOn || tryOnImage;
     if (!baseSource && cameraOn && tryOnVideoRef.current) {
       baseSource = await captureFromCamera();
     }
@@ -470,7 +518,9 @@ export function EcommerceLanding() {
             <div className="mt-4 grid gap-4 md:grid-cols-[1.2fr_0.8fr]">
               <div>
                 <div className={`relative h-72 overflow-hidden rounded-2xl border ${theme === 'dark' ? 'border-cyan-300/25 bg-[#070b12]' : 'border-black/10 bg-white/90'}`}>
-                  {cameraOn ? (
+                  {generatedTryOn ? (
+                    <Image src={generatedTryOn} alt="Generated try-on" fill unoptimized className="object-cover" />
+                  ) : cameraOn ? (
                     <>
                       <video ref={tryOnVideoRef} className="h-full w-full object-cover [transform:scaleX(-1)]" playsInline muted autoPlay />
                       {tryOnProduct && (
@@ -565,6 +615,9 @@ export function EcommerceLanding() {
             </div>
 
             <div className="mt-4 flex flex-wrap gap-2">
+              <button onClick={generateTryOn} disabled={isGeneratingTryOn} className="rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+                {isGeneratingTryOn ? 'Generating…' : 'Generate Try-On'}
+              </button>
               <button onClick={saveTryOnResult} className="rounded-full bg-cyan-500 px-4 py-2 text-sm font-semibold text-white">Save Result</button>
               <button onClick={() => setNotice('Size recommendation generated')} className={`rounded-full border px-4 py-2 text-sm ${theme === 'dark' ? 'border-white/25 bg-white/5' : 'border-black/20'}`}>Suggest Size</button>
               <button onClick={closeTryOn} className={`rounded-full border px-4 py-2 text-sm ${theme === 'dark' ? 'border-white/25 bg-white/5' : 'border-black/20'}`}>End Session</button>
