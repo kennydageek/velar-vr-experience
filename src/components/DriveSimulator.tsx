@@ -280,7 +280,7 @@ function Car({
 }
 
 function Terrain({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
-  const tileSize = 140;
+  const tileSize = 160;
   const tileGeom = useMemo(() => {
     const g = new THREE.PlaneGeometry(tileSize, tileSize, 1, 1);
     g.rotateX(-Math.PI / 2);
@@ -295,8 +295,8 @@ function Terrain({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
     const zWrap = ((offsetZ % tileSize) + tileSize) % tileSize;
 
     let idx = 0;
-    for (let ix = -2; ix <= 2; ix++) {
-      for (let iz = -2; iz <= 2; iz++) {
+    for (let ix = -3; ix <= 3; ix++) {
+      for (let iz = -3; iz <= 3; iz++) {
         const tile = tileRefs.current[idx++];
         if (!tile) continue;
         tile.position.set(ix * tileSize - xWrap, -1.15, iz * tileSize - zWrap);
@@ -306,9 +306,9 @@ function Terrain({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
 
   return (
     <group>
-      {[-2, -1, 0, 1, 2].flatMap((ix) =>
-        [-2, -1, 0, 1, 2].map((iz, innerIdx) => {
-          const index = (ix + 2) * 5 + innerIdx;
+      {[-3, -2, -1, 0, 1, 2, 3].flatMap((ix) =>
+        [-3, -2, -1, 0, 1, 2, 3].map((iz, innerIdx) => {
+          const index = (ix + 3) * 7 + innerIdx;
           return (
             <mesh
               key={`${ix}-${iz}`}
@@ -328,6 +328,58 @@ function Terrain({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
         }),
       )}
 
+    </group>
+  );
+}
+
+function DistantDepth({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
+  const skylineRef = useRef<THREE.Group>(null);
+  const glowRef = useRef<THREE.Points>(null);
+
+  const glowGeo = useMemo(() => {
+    const count = 160;
+    const arr = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      arr[i * 3] = (n2(i * 0.73, 1.3) - 0.5) * 420;
+      arr[i * 3 + 1] = 7 + n2(i * 0.37, 2.8) * 22;
+      arr[i * 3 + 2] = -180 - n2(i * 0.91, 4.2) * 240;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+    return g;
+  }, []);
+
+  useFrame((state) => {
+    const x = worldRef.current.offsetX;
+    const z = worldRef.current.offsetZ;
+
+    if (skylineRef.current) {
+      skylineRef.current.position.x = -(x % 320) * 0.12;
+      skylineRef.current.position.z = -(z % 320) * 0.12 - 150;
+    }
+
+    if (glowRef.current) {
+      glowRef.current.position.x = -(x % 320) * 0.1;
+      glowRef.current.position.z = -(z % 320) * 0.1 - 170;
+      const m = glowRef.current.material as THREE.PointsMaterial;
+      m.opacity = 0.26 + 0.12 * (0.5 + 0.5 * Math.sin(state.clock.elapsedTime * 0.65));
+    }
+  });
+
+  return (
+    <group>
+      <group ref={skylineRef}>
+        {Array.from({ length: 26 }).map((_, i) => (
+          <mesh key={i} position={[-200 + i * 16, 7 + (i % 5) * 2.2, -50]}>
+            <boxGeometry args={[8, 14 + (i % 6) * 4, 8]} />
+            <meshStandardMaterial color="#141820" roughness={0.88} metalness={0.12} />
+          </mesh>
+        ))}
+      </group>
+
+      <points ref={glowRef} geometry={glowGeo}>
+        <pointsMaterial color="#9ad7ff" size={1.4} transparent opacity={0.3} depthWrite={false} />
+      </points>
     </group>
   );
 }
@@ -522,6 +574,7 @@ export function DriveSimulator() {
         />
         <Sky worldRef={worldRef} />
         <Terrain worldRef={worldRef} />
+        <DistantDepth worldRef={worldRef} />
         <CameraController worldRef={worldRef} />
 
         <Environment preset="city" />
