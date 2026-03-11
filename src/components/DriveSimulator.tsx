@@ -3,13 +3,26 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Environment } from '@react-three/drei';
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MutableRefObject,
+} from 'react';
 import * as THREE from 'three';
 import { useFerrariModel } from './FerrariModel';
 
 type Gear = 'P' | 'R' | 'N' | 'D';
 type GripMode = 'comfort' | 'sport' | 'track';
-type Keys = { w: boolean; s: boolean; a: boolean; d: boolean; space: boolean; shift: boolean };
+type Keys = {
+  w: boolean;
+  s: boolean;
+  a: boolean;
+  d: boolean;
+  space: boolean;
+  shift: boolean;
+};
 
 type Telemetry = {
   speedKmh: number;
@@ -46,7 +59,11 @@ function smoothNoise(x: number, y: number) {
   const c = n2(xi, yi + 1);
   const d = n2(xi + 1, yi + 1);
 
-  return THREE.MathUtils.lerp(THREE.MathUtils.lerp(a, b, u), THREE.MathUtils.lerp(c, d, u), v);
+  return THREE.MathUtils.lerp(
+    THREE.MathUtils.lerp(a, b, u),
+    THREE.MathUtils.lerp(c, d, u),
+    v,
+  );
 }
 
 function fbm(x: number, y: number) {
@@ -75,7 +92,11 @@ function Car({
   const modelRef = useRef<THREE.Group>(null);
   const chassisRef = useRef<THREE.Group>(null);
   const brakeLight = useRef<THREE.Mesh>(null);
-  const { object: fittedCar, wheels, frontWheels } = useFerrariModel({ targetLength: 2.4 });
+  const {
+    object: fittedCar,
+    wheels,
+    frontWheels,
+  } = useFerrariModel({ targetLength: 2.4 });
 
   const heading = useRef(0);
   const speed = useRef(0);
@@ -87,7 +108,14 @@ function Car({
   const prevSpeed = useRef(0);
   const worldOffset = useRef(new THREE.Vector2(0, 0));
 
-  const keys = useRef<Keys>({ w: false, s: false, a: false, d: false, space: false, shift: false });
+  const keys = useRef<Keys>({
+    w: false,
+    s: false,
+    a: false,
+    d: false,
+    space: false,
+    shift: false,
+  });
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent, down: boolean) => {
@@ -117,7 +145,13 @@ function Car({
         ? { maxForward: 19, accel: 13, brake: 25, drag: 8.3, gripFloor: 0.56 }
         : gripMode === 'sport'
           ? { maxForward: 26, accel: 18, brake: 31, drag: 6.9, gripFloor: 0.44 }
-          : { maxForward: 32, accel: 22, brake: 35, drag: 5.9, gripFloor: 0.34 };
+          : {
+              maxForward: 32,
+              accel: 22,
+              brake: 35,
+              drag: 5.9,
+              gripFloor: 0.34,
+            };
 
     const boost = keys.current.shift ? 1.18 : 1;
     const maxForward = gripCfg.maxForward * boost;
@@ -130,8 +164,16 @@ function Car({
     if (gear === 'D' && wantsThrottle) throttleTarget = 1;
     if (gear === 'R' && wantsThrottle) throttleTarget = -0.7;
 
-    throttleInput.current = THREE.MathUtils.lerp(throttleInput.current, throttleTarget, 0.14);
-    brakeInput.current = THREE.MathUtils.lerp(brakeInput.current, wantsBrake ? 1 : 0, 0.22);
+    throttleInput.current = THREE.MathUtils.lerp(
+      throttleInput.current,
+      throttleTarget,
+      0.14,
+    );
+    brakeInput.current = THREE.MathUtils.lerp(
+      brakeInput.current,
+      wantsBrake ? 1 : 0,
+      0.22,
+    );
 
     speed.current += throttleInput.current * gripCfg.accel * dt;
 
@@ -140,26 +182,42 @@ function Car({
     if (absActive) {
       absPhase.current += dt * 20;
       const pulse = 0.72 + 0.28 * (0.5 + 0.5 * Math.sin(absPhase.current));
-      speed.current -= Math.sign(speed.current || 1) * gripCfg.brake * pulse * dt;
+      speed.current -=
+        Math.sign(speed.current || 1) * gripCfg.brake * pulse * dt;
     } else if (wantsBrake) {
       speed.current -= Math.sign(speed.current || 1) * gripCfg.brake * dt;
     }
 
     if (!wantsThrottle) {
-      speed.current -= Math.sign(speed.current) * Math.min(Math.abs(speed.current), gripCfg.drag * dt);
+      speed.current -=
+        Math.sign(speed.current) *
+        Math.min(Math.abs(speed.current), gripCfg.drag * dt);
     }
 
     if (gear === 'P') speed.current *= 1 - Math.min(0.95, dt * 10);
     if (gear === 'N') speed.current *= 1 - Math.min(0.7, dt * 4.5);
 
-    speed.current = THREE.MathUtils.clamp(speed.current, maxReverse, maxForward);
+    speed.current = THREE.MathUtils.clamp(
+      speed.current,
+      maxReverse,
+      maxForward,
+    );
 
     const speedAbs = Math.abs(speed.current);
     const steerTarget = (keys.current.a ? 1 : 0) + (keys.current.d ? -1 : 0);
     const grip = THREE.MathUtils.clamp(1 - speedAbs / 46, gripCfg.gripFloor, 1);
-    steer.current = THREE.MathUtils.lerp(steer.current, steerTarget * grip, 0.16);
+    steer.current = THREE.MathUtils.lerp(
+      steer.current,
+      steerTarget * grip,
+      0.16,
+    );
 
-    const slipDemand = THREE.MathUtils.clamp((Math.abs(steer.current) * Math.abs(throttleInput.current) * speedAbs) / 14, 0, 1);
+    const slipDemand = THREE.MathUtils.clamp(
+      (Math.abs(steer.current) * Math.abs(throttleInput.current) * speedAbs) /
+        14,
+      0,
+      1,
+    );
     slipRef.current = THREE.MathUtils.lerp(slipRef.current, slipDemand, 0.08);
 
     const yawGrip = THREE.MathUtils.lerp(1, 0.58, slipRef.current);
@@ -172,11 +230,25 @@ function Car({
 
     modelRef.current.rotation.y = heading.current + Math.PI;
 
-    const pitch = THREE.MathUtils.clamp((throttleInput.current - brakeInput.current) * 0.06, -0.08, 0.06);
+    const pitch = THREE.MathUtils.clamp(
+      (throttleInput.current - brakeInput.current) * 0.06,
+      -0.08,
+      0.06,
+    );
     const roll = THREE.MathUtils.clamp(-steer.current * 0.08, -0.09, 0.09);
-    const bounce = Math.sin(performance.now() * 0.01 + speedAbs) * (speedAbs > 2 ? 0.008 : 0);
-    chassisRef.current.rotation.z = THREE.MathUtils.lerp(chassisRef.current.rotation.z, pitch, 0.1);
-    chassisRef.current.rotation.x = THREE.MathUtils.lerp(chassisRef.current.rotation.x, roll, 0.1);
+    const bounce =
+      Math.sin(performance.now() * 0.01 + speedAbs) *
+      (speedAbs > 2 ? 0.008 : 0);
+    chassisRef.current.rotation.z = THREE.MathUtils.lerp(
+      chassisRef.current.rotation.z,
+      pitch,
+      0.1,
+    );
+    chassisRef.current.rotation.x = THREE.MathUtils.lerp(
+      chassisRef.current.rotation.x,
+      roll,
+      0.1,
+    );
     chassisRef.current.position.y = 0.42 + bounce;
 
     if (speedAbs > 0.08) {
@@ -189,7 +261,9 @@ function Car({
 
     if (brakeLight.current) {
       const m = brakeLight.current.material as THREE.MeshStandardMaterial;
-      const absBlink = absActive ? 2 + (0.5 + 0.5 * Math.sin(absPhase.current * 1.2)) * 1.2 : 2.7;
+      const absBlink = absActive
+        ? 2 + (0.5 + 0.5 * Math.sin(absPhase.current * 1.2)) * 1.2
+        : 2.7;
       m.emissiveIntensity = wantsBrake ? absBlink : 0.35;
     }
 
@@ -198,7 +272,11 @@ function Car({
 
     telemetryRef.current = {
       speedKmh: Math.max(0, speed.current * 3.6),
-      rpm: THREE.MathUtils.clamp(850 + speedAbs * 230 + Math.abs(throttleInput.current) * 1250, 850, 7600),
+      rpm: THREE.MathUtils.clamp(
+        850 + speedAbs * 230 + Math.abs(throttleInput.current) * 1250,
+        850,
+        7600,
+      ),
       steer: steerBase,
       slip: slipRef.current,
       absActive,
@@ -220,7 +298,11 @@ function Car({
         <primitive object={fittedCar} />
         <mesh ref={brakeLight} position={[1.2, 0.27, 0]}>
           <boxGeometry args={[0.12, 0.03, 0.94]} />
-          <meshStandardMaterial color="#ff7f93" emissive="#ff334e" emissiveIntensity={0.35} />
+          <meshStandardMaterial
+            color="#ff7f93"
+            emissive="#ff334e"
+            emissiveIntensity={0.35}
+          />
         </mesh>
       </group>
     </group>
@@ -244,7 +326,10 @@ function Terrain({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
   }, []);
 
   const treeGeom = useMemo(() => new THREE.ConeGeometry(0.35, 2.1, 6), []);
-  const treeMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#4d7b57', roughness: 0.92 }), []);
+  const treeMat = useMemo(
+    () => new THREE.MeshStandardMaterial({ color: '#4d7b57', roughness: 0.92 }),
+    [],
+  );
   const roadMarkGeom = useMemo(() => new THREE.PlaneGeometry(0.25, 2.6), []);
 
   const tileRefs = useRef<Array<THREE.Mesh | null>>([]);
@@ -331,31 +416,72 @@ function Terrain({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
         [-1, 0, 1].map((iz, innerIdx) => {
           const index = (ix + 1) * 3 + innerIdx;
           return (
-            <mesh key={`${ix}-${iz}`} ref={(el) => (tileRefs.current[index] = el)} geometry={tileGeom} receiveShadow>
-              <meshStandardMaterial color="#5f7254" roughness={0.98} metalness={0.03} />
+            <mesh
+              key={`${ix}-${iz}`}
+              ref={(el) => (tileRefs.current[index] = el)}
+              geometry={tileGeom}
+              receiveShadow
+            >
+              <meshStandardMaterial
+                color="#5f7254"
+                roughness={0.98}
+                metalness={0.03}
+              />
             </mesh>
           );
         }),
       )}
 
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.39, 0]} receiveShadow>
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, -0.39, 0]}
+        receiveShadow
+      >
         <planeGeometry args={[18, 260]} />
-        <meshPhysicalMaterial color="#29292d" roughness={0.32} metalness={0.25} clearcoat={0.85} clearcoatRoughness={0.12} />
+        <meshPhysicalMaterial
+          color="#29292d"
+          roughness={0.32}
+          metalness={0.25}
+          clearcoat={0.85}
+          clearcoatRoughness={0.12}
+        />
       </mesh>
 
       {Array.from({ length: 42 }).map((_, i) => (
-        <mesh key={i} geometry={roadMarkGeom} position={[0, -0.385, i * 6.4 - 134]} rotation={[-Math.PI / 2, 0, 0]}>
-          <meshStandardMaterial color="#ecf1f5" emissive="#d6e2ea" emissiveIntensity={0.15} />
+        <mesh
+          key={i}
+          geometry={roadMarkGeom}
+          position={[0, -0.385, i * 6.4 - 134]}
+          rotation={[-Math.PI / 2, 0, 0]}
+        >
+          <meshStandardMaterial
+            color="#ecf1f5"
+            emissive="#d6e2ea"
+            emissiveIntensity={0.15}
+          />
         </mesh>
       ))}
 
-      <instancedMesh ref={treeInstRef} args={[treeGeom, treeMat, treeMatrices.length]} castShadow receiveShadow />
+      <instancedMesh
+        ref={treeInstRef}
+        args={[treeGeom, treeMat, treeMatrices.length]}
+        castShadow
+        receiveShadow
+      />
 
       <group ref={cloudRef} position={[0, 20, -70]}>
         {Array.from({ length: 18 }).map((_, i) => (
-          <mesh key={i} position={[(n2(i, 2) - 0.5) * 120, n2(i, 3) * 10, -n2(i, 4) * 120]}>
+          <mesh
+            key={i}
+            position={[(n2(i, 2) - 0.5) * 120, n2(i, 3) * 10, -n2(i, 4) * 120]}
+          >
             <sphereGeometry args={[2.8 + n2(i, 7) * 2.3, 12, 12]} />
-            <meshStandardMaterial color="#d7deef" transparent opacity={0.14} depthWrite={false} />
+            <meshStandardMaterial
+              color="#d7deef"
+              transparent
+              opacity={0.14}
+              depthWrite={false}
+            />
           </mesh>
         ))}
       </group>
@@ -372,20 +498,32 @@ function Terrain({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
       <group ref={mountainFarRef} position={[0, 4, -210]}>
         {Array.from({ length: 12 }).map((_, i) => (
           <mesh key={i} position={[-170 + i * 32, 0, 0]}>
-            <coneGeometry args={[22 + n2(i, 21) * 12, 38 + n2(i, 22) * 20, 5]} />
+            <coneGeometry
+              args={[22 + n2(i, 21) * 12, 38 + n2(i, 22) * 20, 5]}
+            />
             <meshStandardMaterial color="#202838" roughness={0.98} />
           </mesh>
         ))}
       </group>
 
       <points ref={cityLightsRef} geometry={cityPoints}>
-        <pointsMaterial color="#8ed6ff" size={1.6} transparent opacity={0.4} depthWrite={false} />
+        <pointsMaterial
+          color="#8ed6ff"
+          size={1.6}
+          transparent
+          opacity={0.4}
+          depthWrite={false}
+        />
       </points>
     </group>
   );
 }
 
-function CameraController({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
+function CameraController({
+  worldRef,
+}: {
+  worldRef: MutableRefObject<WorldState>;
+}) {
   const { camera } = useThree();
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
 
@@ -400,7 +538,11 @@ function CameraController({ worldRef }: { worldRef: MutableRefObject<WorldState>
     const { speed, steer } = worldRef.current;
     const speedAbs = Math.abs(speed);
 
-    const targetPos = new THREE.Vector3(-2.8 - steer * 1.1, 1.75 + Math.min(speedAbs * 0.02, 0.7), -3.4);
+    const targetPos = new THREE.Vector3(
+      -2.8 - steer * 1.1,
+      1.75 + Math.min(speedAbs * 0.02, 0.7),
+      -3.4,
+    );
     const lookAt = new THREE.Vector3(0, 0.55 + speedAbs * 0.005, 4.5);
 
     cam.position.lerp(targetPos, 1 - Math.exp(-dt * 4.2));
@@ -408,7 +550,11 @@ function CameraController({ worldRef }: { worldRef: MutableRefObject<WorldState>
 
     const targetFov = 52 + Math.min(speedAbs * 0.9, 12);
     cam.fov = THREE.MathUtils.lerp(cam.fov, targetFov, 1 - Math.exp(-dt * 3.2));
-    cam.rotation.z = THREE.MathUtils.lerp(cam.rotation.z, -steer * 0.05, 1 - Math.exp(-dt * 6));
+    cam.rotation.z = THREE.MathUtils.lerp(
+      cam.rotation.z,
+      -steer * 0.05,
+      1 - Math.exp(-dt * 6),
+    );
     cam.updateProjectionMatrix();
   });
 
@@ -437,7 +583,11 @@ function Sky({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
     const dir = worldRef.current.heading;
 
     if (sunRef.current) {
-      sunRef.current.position.set(Math.sin(dir + t * 0.03) * 20, 16 + Math.sin(t * 0.2) * 2.8, Math.cos(dir + t * 0.03) * 20);
+      sunRef.current.position.set(
+        Math.sin(dir + t * 0.03) * 20,
+        16 + Math.sin(t * 0.2) * 2.8,
+        Math.cos(dir + t * 0.03) * 20,
+      );
       sunRef.current.intensity = 2.3 + Math.sin(t * 0.3) * 0.25;
     }
 
@@ -452,18 +602,48 @@ function Sky({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
       <fog attach="fog" args={['#1f2634', 14, 150]} />
       <ambientLight intensity={0.45} />
       <hemisphereLight intensity={0.42} color="#b9d7ff" groundColor="#1c2330" />
-      <directionalLight ref={sunRef} position={[10, 18, 8]} intensity={2.4} color="#dfe9ff" castShadow />
-      <pointLight position={[0, 2.5, -5]} color="#76c8ff" intensity={8} distance={32} />
+      <directionalLight
+        ref={sunRef}
+        position={[10, 18, 8]}
+        intensity={2.4}
+        color="#dfe9ff"
+        castShadow
+      />
+      <pointLight
+        position={[0, 2.5, -5]}
+        color="#76c8ff"
+        intensity={8}
+        distance={32}
+      />
       <points ref={particlesRef} geometry={particleGeo}>
-        <pointsMaterial color="#9fd8ff" size={0.12} transparent opacity={0.35} depthWrite={false} />
+        <pointsMaterial
+          color="#9fd8ff"
+          size={0.12}
+          transparent
+          opacity={0.35}
+          depthWrite={false}
+        />
       </points>
     </>
   );
 }
 
 export function DriveSimulator() {
-  const telemetryRef = useRef<Telemetry>({ speedKmh: 0, rpm: 900, steer: 0, slip: 0, absActive: false });
-  const worldRef = useRef<WorldState>({ heading: 0, speed: 0, steer: 0, offsetX: 0, offsetZ: 0, accel: 0 });
+  const telemetryRef = useRef<Telemetry>({
+    speedKmh: 0,
+    rpm: 900,
+    steer: 0,
+    slip: 0,
+    absActive: false,
+  });
+  const worldRef = useRef<WorldState>({
+    heading: 0,
+    speed: 0,
+    steer: 0,
+    offsetX: 0,
+    offsetZ: 0,
+    accel: 0,
+  });
 
   const [speed, setSpeed] = useState(0);
   const [rpm, setRpm] = useState(900);
@@ -483,43 +663,69 @@ export function DriveSimulator() {
   }, []);
 
   const gears = useMemo(() => ['P', 'R', 'N', 'D'] as Gear[], []);
-  const gripModes = useMemo(() => ['comfort', 'sport', 'track'] as GripMode[], []);
+  const gripModes = useMemo(
+    () => ['comfort', 'sport', 'track'] as GripMode[],
+    [],
+  );
 
   return (
     <section className="relative h-screen bg-[#1a1f2c] text-white">
-      <Canvas dpr={[1, 1.5]} camera={{ position: [-2.8, 1.75, -3.4], fov: 52 }} shadows>
+      <Canvas
+        dpr={[1, 1.5]}
+        camera={{ position: [-2.8, 1.75, -3.4], fov: 52 }}
+        shadows
+      >
         <color attach="background" args={['#1a1f2c']} />
 
         <Sky worldRef={worldRef} />
         <Terrain worldRef={worldRef} />
-        <Car gear={gear} gripMode={gripMode} telemetryRef={telemetryRef} worldRef={worldRef} />
+        <Car
+          gear={gear}
+          gripMode={gripMode}
+          telemetryRef={telemetryRef}
+          worldRef={worldRef}
+        />
         <CameraController worldRef={worldRef} />
 
         <Environment preset="city" />
       </Canvas>
 
       <div className="absolute left-0 top-0 flex w-full items-center justify-between px-6 py-6">
-        <Link href="/" className="rounded-full border border-white/25 px-4 py-2 text-xs tracking-[0.2em] text-white/80">
+        <Link
+          href="/"
+          className="rounded-full border border-white/25 px-4 py-2 text-xs tracking-[0.2em] text-white/80"
+        >
           BACK
         </Link>
-        <p className="text-xs tracking-[0.2em] text-white/80">CINEMATIC DRIVE</p>
+        <p className="text-xs tracking-[0.2em] text-white/80">
+          CINEMATIC DRIVE
+        </p>
       </div>
 
       <div className="absolute bottom-4 left-4 right-4 grid gap-2 md:grid-cols-3">
         <div className="rounded-2xl border border-white/20 bg-black/35 p-3">
-          <p className="text-[10px] tracking-[0.2em] text-white/60">SPEED / RPM</p>
+          <p className="text-[10px] tracking-[0.2em] text-white/60">
+            SPEED / RPM
+          </p>
           <p className="mt-1 text-2xl font-semibold">
-            {Math.round(speed)} <span className="text-xs text-white/60">km/h</span>
+            {Math.round(speed)}{' '}
+            <span className="text-xs text-white/60">km/h</span>
           </p>
           <p className="text-xs text-white/75">{Math.round(rpm)} rpm</p>
-          <p className="text-[10px] text-white/70">Slip: {Math.round(slip * 100)}%</p>
-          <p className={`text-[10px] ${absActive ? 'text-amber-300' : 'text-white/45'}`}>ABS: {absActive ? 'ACTIVE' : 'OFF'}</p>
+          <p className="text-[10px] text-white/70">
+            Slip: {Math.round(slip * 100)}%
+          </p>
+          <p
+            className={`text-[10px] ${absActive ? 'text-amber-300' : 'text-white/45'}`}
+          >
+            ABS: {absActive ? 'ACTIVE' : 'OFF'}
+          </p>
           <div className="mt-2 flex gap-1.5">
             {gears.map((g) => (
               <button
                 key={g}
                 onClick={() => setGear(g)}
-                className={`rounded-full px-2.5 py-1 text-[10px] ${gear === g ? 'bg-white text-black' : 'border border-white/30 text-white/85'}`}
+                className={`rounded-full px-3 py-1.5 text-[10px] font-medium transition ${gear === g ? 'bg-white text-black' : 'border border-white/30 text-white/85 hover:bg-white/10'}`}
               >
                 {g}
               </button>
@@ -528,14 +734,20 @@ export function DriveSimulator() {
         </div>
 
         <div className="rounded-2xl border border-white/20 bg-black/35 p-3 text-[11px] text-white/85">
-          <p className="mb-1 text-[10px] tracking-[0.2em] text-white/60">DRIVE CONTROLS</p>
+          <p className="mb-1 text-[10px] tracking-[0.2em] text-white/60">
+            DRIVE CONTROLS
+          </p>
           <p>W/↑ throttle · S/↓ brake · A,D or ←,→ steer</p>
           <p>Space handbrake · Shift boost</p>
-          <p className="mt-1 text-white/60">Terrain streams under the car (infinite-run illusion)</p>
+          <p className="mt-1 text-white/60">
+            Terrain streams under the car (infinite-run illusion)
+          </p>
         </div>
 
         <div className="rounded-2xl border border-white/20 bg-black/35 p-3 text-[11px] text-white/85">
-          <p className="mb-1 text-[10px] tracking-[0.2em] text-white/60">HANDLING</p>
+          <p className="mb-1 text-[10px] tracking-[0.2em] text-white/60">
+            HANDLING
+          </p>
           <div className="flex gap-1.5">
             {gripModes.map((g) => (
               <button
