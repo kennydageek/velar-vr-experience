@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { Camera, Moon, ShoppingBag, Sparkles, Sun } from 'lucide-react';
 import { products } from '@/lib/products';
 
 type ThemeMode = 'light' | 'dark';
@@ -341,14 +342,16 @@ export function EcommerceLanding() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            className={`rounded-full border px-4 py-2 text-xs tracking-[0.2em] ${theme === 'dark' ? 'border-white/25' : 'border-black/20'}`}
+            className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs tracking-[0.15em] ${theme === 'dark' ? 'border-white/25' : 'border-black/20'}`}
           >
+            {theme === 'dark' ? <Sun size={14} aria-hidden="true" /> : <Moon size={14} aria-hidden="true" />}
             {theme === 'dark' ? 'LIGHT MODE' : 'DARK MODE'}
           </button>
           <button
             onClick={() => setNotice(`Cart has ${cartCount} item${cartCount === 1 ? '' : 's'}`)}
-            className={`rounded-full border px-4 py-2 text-xs tracking-[0.15em] ${theme === 'dark' ? 'border-white/25' : 'border-black/20'}`}
+            className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs tracking-[0.15em] ${theme === 'dark' ? 'border-white/25' : 'border-black/20'}`}
           >
+            <ShoppingBag size={14} aria-hidden="true" />
             CART ({cartCount})
           </button>
           <Link href="/drive" className="rounded-full bg-cyan-500 px-4 py-2 text-xs font-semibold tracking-[0.15em] text-white">
@@ -462,7 +465,7 @@ export function EcommerceLanding() {
                 onClick={() => openTryOn(label)}
                 className={`rounded-2xl border p-4 text-left transition hover:scale-[1.02] ${theme === 'dark' ? 'border-white/15 bg-black/30' : 'border-black/10 bg-white/90'}`}
               >
-                <p className="text-sm font-semibold">{label}</p>
+                <p className="inline-flex items-center gap-2 text-sm font-semibold"><Camera size={15} aria-hidden="true" /> {label}</p>
                 <p className={`mt-1 text-xs ${t.soft}`}>Session {i + 1} · Ready</p>
               </button>
             ))}
@@ -564,7 +567,8 @@ export function EcommerceLanding() {
                   onChange={(e) => onUploadTryOnImage(e.target.files?.[0])}
                   className="hidden"
                 />
-                <button onClick={openTryOnPicker} className="mb-2 w-full rounded-xl bg-cyan-500 px-3 py-2 text-xs font-semibold text-white">
+                <button onClick={openTryOnPicker} className="mb-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-500 px-3 py-2 text-xs font-semibold text-white">
+                  <Camera size={15} aria-hidden="true" />
                   Upload / Take Photo
                 </button>
                 <div className="mb-2 grid grid-cols-2 gap-2">
@@ -611,7 +615,8 @@ export function EcommerceLanding() {
             </div>
 
             <div className="mt-4 flex flex-wrap gap-2">
-              <button onClick={generateTryOn} disabled={isGeneratingTryOn} className="rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+              <button onClick={generateTryOn} disabled={isGeneratingTryOn} className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+                <Sparkles size={16} aria-hidden="true" />
                 {isGeneratingTryOn ? 'Generating…' : 'Generate Try-On'}
               </button>
               <button onClick={saveTryOnResult} className="rounded-full bg-cyan-500 px-4 py-2 text-sm font-semibold text-white">Save Result</button>
