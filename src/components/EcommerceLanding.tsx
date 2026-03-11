@@ -28,8 +28,11 @@ export function EcommerceLanding() {
   const [overlayY, setOverlayY] = useState(0);
   const [overlayScale, setOverlayScale] = useState(1);
   const [overlayRotation, setOverlayRotation] = useState(0);
+  const [cameraOn, setCameraOn] = useState(false);
   const [notice, setNotice] = useState<string>('');
   const tryOnInputRef = useRef<HTMLInputElement | null>(null);
+  const tryOnVideoRef = useRef<HTMLVideoElement | null>(null);
+  const tryOnStreamRef = useRef<MediaStream | null>(null);
 
   const t = useMemo(() => {
     if (theme === 'dark') {
@@ -56,6 +59,13 @@ export function EcommerceLanding() {
     const id = window.setTimeout(() => setNotice(''), 1800);
     return () => window.clearTimeout(id);
   }, [notice]);
+
+  useEffect(() => {
+    return () => {
+      tryOnStreamRef.current?.getTracks().forEach((t) => t.stop());
+      tryOnStreamRef.current = null;
+    };
+  }, []);
 
   const addToCart = (name: string) => {
     setCartCount((v) => v + 1);
@@ -164,15 +174,83 @@ export function EcommerceLanding() {
 
   const openTryOnPicker = () => tryOnInputRef.current?.click();
 
+  const startLiveCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+      tryOnStreamRef.current?.getTracks().forEach((t) => t.stop());
+      tryOnStreamRef.current = stream;
+      setCameraOn(true);
+      setTryOnImage(null);
+
+      if (tryOnVideoRef.current) {
+        tryOnVideoRef.current.srcObject = stream;
+        await tryOnVideoRef.current.play();
+      }
+
+      setNotice('Live camera started.');
+    } catch {
+      setNotice('Camera access denied/unavailable.');
+    }
+  };
+
+  const stopLiveCamera = () => {
+    tryOnStreamRef.current?.getTracks().forEach((t) => t.stop());
+    tryOnStreamRef.current = null;
+    setCameraOn(false);
+    setNotice('Live camera stopped.');
+  };
+
+  const captureFromCamera = async (): Promise<string | null> => {
+    const v = tryOnVideoRef.current;
+    if (!v || !cameraOn) {
+      setNotice('Camera is not active.');
+      return null;
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = v.videoWidth || 1280;
+    canvas.height = v.videoHeight || 720;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    ctx.save();
+    ctx.scale(-1, 1);
+    ctx.drawImage(v, -canvas.width, 0, canvas.width, canvas.height);
+    ctx.restore();
+
+    const captured = canvas.toDataURL('image/png');
+    setTryOnImage(captured);
+    setCameraOn(false);
+    stopLiveCamera();
+    await autoAnchorTryOn(captured);
+    setNotice('Captured frame for try-on.');
+    return captured;
+  };
+
+  const closeTryOn = () => {
+    stopLiveCamera();
+    setTryOnSession(null);
+  };
+
   const saveTryOnResult = async () => {
-    if (!tryOnImage || !tryOnProduct) {
-      setNotice('Upload an image and select a product first.');
+    if (!tryOnProduct) {
+      setNotice('Select a product first.');
+      return;
+    }
+
+    let baseSource = tryOnImage;
+    if (!baseSource && cameraOn && tryOnVideoRef.current) {
+      baseSource = await captureFromCamera();
+    }
+
+    if (!baseSource) {
+      setNotice('Upload image or start camera first.');
       return;
     }
 
     const base = new window.Image();
     base.crossOrigin = 'anonymous';
-    base.src = tryOnImage;
+    base.src = baseSource;
     await new Promise((resolve, reject) => {
       base.onload = resolve;
       base.onerror = reject;
@@ -384,7 +462,7 @@ export function EcommerceLanding() {
       )}
 
       {tryOnSession && (
-        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/65 p-4" onClick={() => setTryOnSession(null)}>
+        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/65 p-4" onClick={closeTryOn}>
           <div className={`w-full max-w-3xl rounded-3xl border p-5 ${theme === 'dark' ? 'border-white/15 bg-[#0b0f17]' : 'border-black/10 bg-white'}`} onClick={(e) => e.stopPropagation()}>
             <p className={`text-xs tracking-[0.2em] ${t.soft}`}>LIVE TRY-ON SESSION</p>
             <h3 className="mt-2 text-2xl font-semibold">{tryOnSession}</h3>
@@ -392,7 +470,22 @@ export function EcommerceLanding() {
             <div className="mt-4 grid gap-4 md:grid-cols-[1.2fr_0.8fr]">
               <div>
                 <div className={`relative h-72 overflow-hidden rounded-2xl border ${theme === 'dark' ? 'border-cyan-300/25 bg-[#070b12]' : 'border-black/10 bg-white/90'}`}>
-                  {tryOnImage ? (
+                  {cameraOn ? (
+                    <>
+                      <video ref={tryOnVideoRef} className="h-full w-full object-cover [transform:scaleX(-1)]" playsInline muted autoPlay />
+                      {tryOnProduct && (
+                        <div
+                          className="pointer-events-none absolute left-1/2 top-[38%]"
+                          style={{
+                            transform: `translate(-50%, -50%) translate(${overlayX}%, ${overlayY}%) rotate(${overlayRotation}deg) scale(${overlayScale})`,
+                            width: '38%',
+                          }}
+                        >
+                          <Image src={tryOnProduct.image} alt={tryOnProduct.name} width={320} height={220} className="h-auto w-full rounded-xl opacity-90 shadow-2xl" />
+                        </div>
+                      )}
+                    </>
+                  ) : tryOnImage ? (
                     <>
                       <Image src={tryOnImage} alt="Uploaded try-on" fill unoptimized className="object-cover" />
                       {tryOnProduct && (
@@ -409,7 +502,7 @@ export function EcommerceLanding() {
                     </>
                   ) : (
                     <div className="flex h-full items-center justify-center text-center">
-                      <p className={`text-sm ${t.soft}`}>Upload a selfie/photo to start try-on</p>
+                      <p className={`text-sm ${t.soft}`}>Upload a selfie/photo or start live camera</p>
                     </div>
                   )}
                 </div>
@@ -428,6 +521,12 @@ export function EcommerceLanding() {
                 <button onClick={openTryOnPicker} className="mb-2 w-full rounded-xl bg-cyan-500 px-3 py-2 text-xs font-semibold text-white">
                   Upload / Take Photo
                 </button>
+                <div className="mb-2 grid grid-cols-2 gap-2">
+                  <button onClick={startLiveCamera} className="rounded-xl bg-emerald-500 px-3 py-2 text-xs font-semibold text-white">Start Live</button>
+                  <button onClick={cameraOn ? captureFromCamera : stopLiveCamera} className="rounded-xl bg-white/15 px-3 py-2 text-xs font-semibold text-white">
+                    {cameraOn ? 'Capture' : 'Stop Live'}
+                  </button>
+                </div>
                 <div
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => {
@@ -468,7 +567,7 @@ export function EcommerceLanding() {
             <div className="mt-4 flex flex-wrap gap-2">
               <button onClick={saveTryOnResult} className="rounded-full bg-cyan-500 px-4 py-2 text-sm font-semibold text-white">Save Result</button>
               <button onClick={() => setNotice('Size recommendation generated')} className={`rounded-full border px-4 py-2 text-sm ${theme === 'dark' ? 'border-white/25 bg-white/5' : 'border-black/20'}`}>Suggest Size</button>
-              <button onClick={() => setTryOnSession(null)} className={`rounded-full border px-4 py-2 text-sm ${theme === 'dark' ? 'border-white/25 bg-white/5' : 'border-black/20'}`}>End Session</button>
+              <button onClick={closeTryOn} className={`rounded-full border px-4 py-2 text-sm ${theme === 'dark' ? 'border-white/25 bg-white/5' : 'border-black/20'}`}>End Session</button>
             </div>
           </div>
         </div>
