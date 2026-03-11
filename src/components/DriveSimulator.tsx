@@ -569,7 +569,6 @@ function Sky({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
 
   return (
     <>
-      <fog attach="fog" args={['#242b35', 34, 260]} />
       <ambientLight intensity={0.45} />
       <hemisphereLight intensity={0.42} color="#b9d7ff" groundColor="#1c2330" />
       <directionalLight
