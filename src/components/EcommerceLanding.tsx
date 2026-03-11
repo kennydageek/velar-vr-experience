@@ -21,6 +21,12 @@ export function EcommerceLanding() {
   const [cartCount, setCartCount] = useState(0);
   const [activeProduct, setActiveProduct] = useState<(typeof products)[number] | null>(null);
   const [tryOnSession, setTryOnSession] = useState<string | null>(null);
+  const [tryOnImage, setTryOnImage] = useState<string | null>(null);
+  const [tryOnProduct, setTryOnProduct] = useState<(typeof products)[number] | null>(null);
+  const [overlayX, setOverlayX] = useState(0);
+  const [overlayY, setOverlayY] = useState(0);
+  const [overlayScale, setOverlayScale] = useState(1);
+  const [overlayRotation, setOverlayRotation] = useState(0);
   const [notice, setNotice] = useState<string>('');
 
   const t = useMemo(() => {
@@ -52,6 +58,75 @@ export function EcommerceLanding() {
   const addToCart = (name: string) => {
     setCartCount((v) => v + 1);
     setNotice(`${name} added to cart`);
+  };
+
+  const openTryOn = (label: string, product?: (typeof products)[number]) => {
+    setTryOnSession(label);
+    setTryOnProduct(product ?? products[0]);
+    setOverlayX(0);
+    setOverlayY(0);
+    setOverlayScale(1);
+    setOverlayRotation(0);
+    setNotice(`${label} started`);
+  };
+
+  const onUploadTryOnImage = (file?: File | null) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setTryOnImage(String(reader.result));
+      setNotice('Image uploaded. Product attached to preview.');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const saveTryOnResult = async () => {
+    if (!tryOnImage || !tryOnProduct) {
+      setNotice('Upload an image and select a product first.');
+      return;
+    }
+
+    const base = new window.Image();
+    base.crossOrigin = 'anonymous';
+    base.src = tryOnImage;
+    await new Promise((resolve, reject) => {
+      base.onload = resolve;
+      base.onerror = reject;
+    });
+
+    const overlay = new window.Image();
+    overlay.crossOrigin = 'anonymous';
+    overlay.src = tryOnProduct.image;
+    await new Promise((resolve, reject) => {
+      overlay.onload = resolve;
+      overlay.onerror = reject;
+    });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = base.width;
+    canvas.height = base.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.drawImage(base, 0, 0);
+
+    const ow = base.width * 0.34 * overlayScale;
+    const oh = (overlay.height / overlay.width) * ow;
+    const cx = base.width * 0.5 + (overlayX / 100) * (base.width * 0.45);
+    const cy = base.height * 0.38 + (overlayY / 100) * (base.height * 0.45);
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate((overlayRotation * Math.PI) / 180);
+    ctx.drawImage(overlay, -ow / 2, -oh / 2, ow, oh);
+    ctx.restore();
+
+    const url = canvas.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'try-on-result.png';
+    a.click();
+    setNotice('Try-on image saved.');
   };
 
   return (
@@ -178,10 +253,7 @@ export function EcommerceLanding() {
             {['Try Glasses in AR', 'Try Sneakers On-Foot', 'Try Jacket on Avatar'].map((label, i) => (
               <button
                 key={label}
-                onClick={() => {
-                  setTryOnSession(label);
-                  setNotice(`${label} started`);
-                }}
+                onClick={() => openTryOn(label)}
                 className={`rounded-2xl border p-4 text-left transition hover:scale-[1.02] ${theme === 'dark' ? 'border-white/15 bg-black/30' : 'border-black/10 bg-white/90'}`}
               >
                 <p className="text-sm font-semibold">{label}</p>
@@ -220,7 +292,7 @@ export function EcommerceLanding() {
             </div>
             <div className="mt-5 flex gap-2">
               <button onClick={() => addToCart(activeProduct.name)} className="rounded-full bg-cyan-500 px-4 py-2 text-sm font-semibold text-white">Add to Cart</button>
-              <button onClick={() => setTryOnSession(`Try ${activeProduct.name}`)} className={`rounded-full border px-4 py-2 text-sm ${theme === 'dark' ? 'border-white/25' : 'border-black/20'}`}>Virtual Try-On</button>
+              <button onClick={() => openTryOn(`Try ${activeProduct.name}`, activeProduct)} className={`rounded-full border px-4 py-2 text-sm ${theme === 'dark' ? 'border-white/25' : 'border-black/20'}`}>Virtual Try-On</button>
               <button onClick={() => setActiveProduct(null)} className={`rounded-full border px-4 py-2 text-sm ${theme === 'dark' ? 'border-white/25' : 'border-black/20'}`}>Close</button>
             </div>
           </div>
@@ -229,17 +301,64 @@ export function EcommerceLanding() {
 
       {tryOnSession && (
         <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/65 p-4" onClick={() => setTryOnSession(null)}>
-          <div className={`w-full max-w-2xl rounded-3xl border p-5 ${theme === 'dark' ? 'border-white/15 bg-[#0b0f17]' : 'border-black/10 bg-white'}`} onClick={(e) => e.stopPropagation()}>
+          <div className={`w-full max-w-3xl rounded-3xl border p-5 ${theme === 'dark' ? 'border-white/15 bg-[#0b0f17]' : 'border-black/10 bg-white'}`} onClick={(e) => e.stopPropagation()}>
             <p className={`text-xs tracking-[0.2em] ${t.soft}`}>LIVE TRY-ON SESSION</p>
             <h3 className="mt-2 text-2xl font-semibold">{tryOnSession}</h3>
-            <div className={`mt-4 h-64 rounded-2xl border ${theme === 'dark' ? 'border-cyan-300/25 bg-[#070b12]' : 'border-black/10 bg-white/90'} flex items-center justify-center`}>
-              <div className="text-center">
-                <p className={`text-sm ${t.soft}`}>Camera preview placeholder · model alignment active</p>
-                <p className={`mt-1 text-xs ${t.soft}`}>Grant camera access to enable real try-on rendering</p>
+
+            <div className="mt-4 grid gap-4 md:grid-cols-[1.2fr_0.8fr]">
+              <div>
+                <div className={`relative h-72 overflow-hidden rounded-2xl border ${theme === 'dark' ? 'border-cyan-300/25 bg-[#070b12]' : 'border-black/10 bg-white/90'}`}>
+                  {tryOnImage ? (
+                    <>
+                      <Image src={tryOnImage} alt="Uploaded try-on" fill unoptimized className="object-cover" />
+                      {tryOnProduct && (
+                        <div
+                          className="pointer-events-none absolute left-1/2 top-[38%]"
+                          style={{
+                            transform: `translate(-50%, -50%) translate(${overlayX}%, ${overlayY}%) rotate(${overlayRotation}deg) scale(${overlayScale})`,
+                            width: '38%',
+                          }}
+                        >
+                          <Image src={tryOnProduct.image} alt={tryOnProduct.name} width={320} height={220} className="h-auto w-full rounded-xl opacity-90 shadow-2xl" />
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-center">
+                      <p className={`text-sm ${t.soft}`}>Upload a selfie/photo to start try-on</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className={`rounded-2xl border p-4 ${theme === 'dark' ? 'border-white/15 bg-white/5' : 'border-black/10 bg-white/80'}`}>
+                <label className="mb-3 block text-xs font-semibold tracking-[0.12em]">UPLOAD IMAGE</label>
+                <input type="file" accept="image/*" onChange={(e) => onUploadTryOnImage(e.target.files?.[0])} className="mb-4 block w-full text-xs" />
+
+                <label className="mb-1 block text-xs font-semibold tracking-[0.12em]">PRODUCT</label>
+                <select
+                  value={tryOnProduct?.name ?? products[0].name}
+                  onChange={(e) => setTryOnProduct(products.find((p) => p.name === e.target.value) ?? products[0])}
+                  className={`mb-4 w-full rounded-xl border px-3 py-2 text-sm ${theme === 'dark' ? 'border-white/20 bg-black/30' : 'border-black/15 bg-white'}`}
+                >
+                  {products.map((p) => (
+                    <option key={p.name} value={p.name}>{p.name}</option>
+                  ))}
+                </select>
+
+                <label className="text-xs">X Position</label>
+                <input type="range" min={-60} max={60} value={overlayX} onChange={(e) => setOverlayX(Number(e.target.value))} className="mb-2 w-full" />
+                <label className="text-xs">Y Position</label>
+                <input type="range" min={-60} max={60} value={overlayY} onChange={(e) => setOverlayY(Number(e.target.value))} className="mb-2 w-full" />
+                <label className="text-xs">Scale</label>
+                <input type="range" min={0.4} max={2.2} step={0.01} value={overlayScale} onChange={(e) => setOverlayScale(Number(e.target.value))} className="mb-2 w-full" />
+                <label className="text-xs">Rotation</label>
+                <input type="range" min={-40} max={40} value={overlayRotation} onChange={(e) => setOverlayRotation(Number(e.target.value))} className="mb-4 w-full" />
               </div>
             </div>
-            <div className="mt-4 flex gap-2">
-              <button onClick={() => setNotice('Snapshot saved to fitting session')} className="rounded-full bg-cyan-500 px-4 py-2 text-sm font-semibold text-white">Capture Fit</button>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button onClick={saveTryOnResult} className="rounded-full bg-cyan-500 px-4 py-2 text-sm font-semibold text-white">Save Result</button>
               <button onClick={() => setNotice('Size recommendation generated')} className={`rounded-full border px-4 py-2 text-sm ${theme === 'dark' ? 'border-white/25 bg-white/5' : 'border-black/20'}`}>Suggest Size</button>
               <button onClick={() => setTryOnSession(null)} className={`rounded-full border px-4 py-2 text-sm ${theme === 'dark' ? 'border-white/25 bg-white/5' : 'border-black/20'}`}>End Session</button>
             </div>
