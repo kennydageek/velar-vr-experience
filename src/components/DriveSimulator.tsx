@@ -46,37 +46,6 @@ function n2(x: number, y: number) {
   return s - Math.floor(s);
 }
 
-function smoothNoise(x: number, y: number) {
-  const xi = Math.floor(x);
-  const yi = Math.floor(y);
-  const xf = x - xi;
-  const yf = y - yi;
-  const u = xf * xf * (3 - 2 * xf);
-  const v = yf * yf * (3 - 2 * yf);
-
-  const a = n2(xi, yi);
-  const b = n2(xi + 1, yi);
-  const c = n2(xi, yi + 1);
-  const d = n2(xi + 1, yi + 1);
-
-  return THREE.MathUtils.lerp(
-    THREE.MathUtils.lerp(a, b, u),
-    THREE.MathUtils.lerp(c, d, u),
-    v,
-  );
-}
-
-function fbm(x: number, y: number) {
-  let value = 0;
-  let amp = 1;
-  let freq = 0.012;
-  for (let i = 0; i < 4; i++) {
-    value += smoothNoise(x * freq, y * freq) * amp;
-    amp *= 0.5;
-    freq *= 2.1;
-  }
-  return value;
-}
 
 function Car({
   gear,
@@ -313,37 +282,17 @@ function Car({
 function Terrain({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
   const tileSize = 140;
   const tileGeom = useMemo(() => {
-    const g = new THREE.PlaneGeometry(tileSize, tileSize, 72, 72);
-    const p = g.attributes.position as THREE.BufferAttribute;
-    for (let i = 0; i < p.count; i++) {
-      const x = p.getX(i);
-      const y = p.getY(i);
-      const h = fbm(x, y) * 2.2;
-      p.setZ(i, h);
-    }
+    const g = new THREE.PlaneGeometry(tileSize, tileSize, 1, 1);
     g.rotateX(-Math.PI / 2);
-    g.computeVertexNormals();
     return g;
   }, []);
 
   const tileRefs = useRef<Array<THREE.Mesh | null>>([]);
-  const cloudRef = useRef<THREE.Group>(null);
-  const mountainNearRef = useRef<THREE.Group>(null);
-  const mountainFarRef = useRef<THREE.Group>(null);
-  const cityLightsRef = useRef<THREE.Points>(null);
-  const smoothX = useRef(0);
-  const smoothZ = useRef(0);
 
-
-
-  useFrame((state, dt) => {
-    const { offsetX, offsetZ, speed } = worldRef.current;
+  useFrame(() => {
+    const { offsetX, offsetZ } = worldRef.current;
     const xWrap = ((offsetX % tileSize) + tileSize) % tileSize;
     const zWrap = ((offsetZ % tileSize) + tileSize) % tileSize;
-    const safeDt = Math.min(dt, 0.05);
-    const lerpFactor = 1 - Math.exp(-safeDt * 10);
-    smoothX.current += (xWrap - smoothX.current) * lerpFactor;
-    smoothZ.current += (zWrap - smoothZ.current) * lerpFactor;
 
     let idx = 0;
     for (let ix = -2; ix <= 2; ix++) {
@@ -353,41 +302,7 @@ function Terrain({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
         tile.position.set(ix * tileSize - xWrap, -1.15, iz * tileSize - zWrap);
       }
     }
-
-    if (cloudRef.current) {
-      cloudRef.current.position.x = -smoothX.current * 0.08;
-      cloudRef.current.position.z = -smoothZ.current * 0.08;
-      cloudRef.current.rotation.y += 0.0002 + Math.abs(speed) * 0.00003;
-    }
-
-    if (mountainNearRef.current) {
-      mountainNearRef.current.position.x = -smoothX.current * 0.14;
-      mountainNearRef.current.position.z = -smoothZ.current * 0.14 - 120;
-    }
-
-    if (mountainFarRef.current) {
-      mountainFarRef.current.position.x = -smoothX.current * 0.08;
-      mountainFarRef.current.position.z = -smoothZ.current * 0.08 - 210;
-    }
-
-    if (cityLightsRef.current) {
-      cityLightsRef.current.position.x = -smoothX.current * 0.12;
-      cityLightsRef.current.position.z = -smoothZ.current * 0.12 - 170;
-    }
   });
-
-  const cityPoints = useMemo(() => {
-    const count = 180;
-    const arr = new Float32Array(count * 3);
-    for (let i = 0; i < count; i++) {
-      arr[i * 3] = (n2(i, 1.7) - 0.5) * 280;
-      arr[i * 3 + 1] = 14 + n2(i * 1.3, 2.1) * 22;
-      arr[i * 3 + 2] = -170 - n2(i * 0.8, 4.1) * 120;
-    }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(arr, 3));
-    return geo;
-  }, []);
 
   return (
     <group>
@@ -413,53 +328,6 @@ function Terrain({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
         }),
       )}
 
-
-      <group ref={cloudRef} position={[0, 20, -70]}>
-        {Array.from({ length: 18 }).map((_, i) => (
-          <mesh
-            key={i}
-            position={[(n2(i, 2) - 0.5) * 120, n2(i, 3) * 10, -n2(i, 4) * 120]}
-          >
-            <sphereGeometry args={[2.8 + n2(i, 7) * 2.3, 12, 12]} />
-            <meshStandardMaterial
-              color="#d7deef"
-              transparent
-              opacity={0.14}
-              depthWrite={false}
-            />
-          </mesh>
-        ))}
-      </group>
-
-      <group ref={mountainNearRef} position={[0, 2, -120]}>
-        {Array.from({ length: 16 }).map((_, i) => (
-          <mesh key={i} position={[-130 + i * 18, 0, 0]}>
-            <coneGeometry args={[11 + n2(i, 11) * 8, 24 + n2(i, 12) * 12, 6]} />
-            <meshStandardMaterial color="#2d3647" roughness={0.95} />
-          </mesh>
-        ))}
-      </group>
-
-      <group ref={mountainFarRef} position={[0, 4, -210]}>
-        {Array.from({ length: 12 }).map((_, i) => (
-          <mesh key={i} position={[-170 + i * 32, 0, 0]}>
-            <coneGeometry
-              args={[22 + n2(i, 21) * 12, 38 + n2(i, 22) * 20, 5]}
-            />
-            <meshStandardMaterial color="#202838" roughness={0.98} />
-          </mesh>
-        ))}
-      </group>
-
-      <points ref={cityLightsRef} geometry={cityPoints}>
-        <pointsMaterial
-          color="#8ed6ff"
-          size={1.6}
-          transparent
-          opacity={0.4}
-          depthWrite={false}
-        />
-      </points>
     </group>
   );
 }
