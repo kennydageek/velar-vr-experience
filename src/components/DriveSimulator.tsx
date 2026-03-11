@@ -140,6 +140,7 @@ function Car({
   useFrame((_, dt) => {
     if (!modelRef.current || !chassisRef.current) return;
 
+    const clampedDt = Math.min(dt, 0.05);
     const gripCfg =
       gripMode === 'comfort'
         ? { maxForward: 19, accel: 13, brake: 25, drag: 8.3, gripFloor: 0.56 }
@@ -175,27 +176,27 @@ function Car({
       0.22,
     );
 
-    speed.current += throttleInput.current * gripCfg.accel * dt;
+    speed.current += throttleInput.current * gripCfg.accel * clampedDt;
 
     const preBrakeSpeed = Math.abs(speed.current);
     const absActive = wantsBrake && preBrakeSpeed > 9;
     if (absActive) {
-      absPhase.current += dt * 20;
+      absPhase.current += clampedDt * 20;
       const pulse = 0.72 + 0.28 * (0.5 + 0.5 * Math.sin(absPhase.current));
       speed.current -=
-        Math.sign(speed.current || 1) * gripCfg.brake * pulse * dt;
+        Math.sign(speed.current || 1) * gripCfg.brake * pulse * clampedDt;
     } else if (wantsBrake) {
-      speed.current -= Math.sign(speed.current || 1) * gripCfg.brake * dt;
+      speed.current -= Math.sign(speed.current || 1) * gripCfg.brake * clampedDt;
     }
 
     if (!wantsThrottle) {
       speed.current -=
         Math.sign(speed.current) *
-        Math.min(Math.abs(speed.current), gripCfg.drag * dt);
+        Math.min(Math.abs(speed.current), gripCfg.drag * clampedDt);
     }
 
-    if (gear === 'P') speed.current *= 1 - Math.min(0.95, dt * 10);
-    if (gear === 'N') speed.current *= 1 - Math.min(0.7, dt * 4.5);
+    if (gear === 'P') speed.current *= 1 - Math.min(0.95, clampedDt * 10);
+    if (gear === 'N') speed.current *= 1 - Math.min(0.7, clampedDt * 4.5);
 
     speed.current = THREE.MathUtils.clamp(
       speed.current,
@@ -221,12 +222,12 @@ function Car({
     slipRef.current = THREE.MathUtils.lerp(slipRef.current, slipDemand, 0.08);
 
     const yawGrip = THREE.MathUtils.lerp(1, 0.58, slipRef.current);
-    heading.current += steer.current * (speed.current / 16) * dt * yawGrip;
+    heading.current += steer.current * (speed.current / 16) * clampedDt * yawGrip;
 
     const forwardX = Math.sin(heading.current);
     const forwardZ = Math.cos(heading.current);
-    worldOffset.current.x += forwardX * speed.current * dt;
-    worldOffset.current.y += forwardZ * speed.current * dt;
+    worldOffset.current.x += forwardX * speed.current * clampedDt;
+    worldOffset.current.y += forwardZ * speed.current * clampedDt;
 
     modelRef.current.rotation.y = heading.current + Math.PI;
 
@@ -252,7 +253,7 @@ function Car({
     chassisRef.current.position.y = 0.42 + bounce;
 
     if (speedAbs > 0.08) {
-      const spin = (speed.current / 0.35) * dt;
+      const spin = (speed.current / 0.35) * clampedDt;
       wheels.forEach((w) => (w.rotation.x -= spin));
     }
 
@@ -267,7 +268,7 @@ function Car({
       m.emissiveIntensity = wantsBrake ? absBlink : 0.35;
     }
 
-    const accel = (speed.current - prevSpeed.current) / Math.max(0.0001, dt);
+    const accel = (speed.current - prevSpeed.current) / Math.max(0.0001, clampedDt);
     prevSpeed.current = speed.current;
 
     telemetryRef.current = {
@@ -338,6 +339,8 @@ function Terrain({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
   const mountainNearRef = useRef<THREE.Group>(null);
   const mountainFarRef = useRef<THREE.Group>(null);
   const cityLightsRef = useRef<THREE.Points>(null);
+  const smoothX = useRef(0);
+  const smoothZ = useRef(0);
 
   const treeMatrices = useMemo(() => {
     const m = new THREE.Matrix4();
@@ -359,10 +362,14 @@ function Terrain({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
     treeInstRef.current.instanceMatrix.needsUpdate = true;
   }, [treeMatrices]);
 
-  useFrame((state) => {
+  useFrame((state, dt) => {
     const { offsetX, offsetZ, speed } = worldRef.current;
     const xWrap = ((offsetX % tileSize) + tileSize) % tileSize;
     const zWrap = ((offsetZ % tileSize) + tileSize) % tileSize;
+    const safeDt = Math.min(dt, 0.05);
+    const lerpFactor = 1 - Math.exp(-safeDt * 10);
+    smoothX.current += (xWrap - smoothX.current) * lerpFactor;
+    smoothZ.current += (zWrap - smoothZ.current) * lerpFactor;
 
     let idx = 0;
     for (let ix = -1; ix <= 1; ix++) {
@@ -374,26 +381,24 @@ function Terrain({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
     }
 
     if (cloudRef.current) {
-      cloudRef.current.position.x = -xWrap * 0.08;
-      cloudRef.current.position.z = -zWrap * 0.08;
+      cloudRef.current.position.x = -smoothX.current * 0.08;
+      cloudRef.current.position.z = -smoothZ.current * 0.08;
       cloudRef.current.rotation.y += 0.0002 + Math.abs(speed) * 0.00003;
     }
 
     if (mountainNearRef.current) {
-      mountainNearRef.current.position.x = -xWrap * 0.14;
-      mountainNearRef.current.position.z = -zWrap * 0.14 - 120;
+      mountainNearRef.current.position.x = -smoothX.current * 0.14;
+      mountainNearRef.current.position.z = -smoothZ.current * 0.14 - 120;
     }
 
     if (mountainFarRef.current) {
-      mountainFarRef.current.position.x = -xWrap * 0.08;
-      mountainFarRef.current.position.z = -zWrap * 0.08 - 210;
+      mountainFarRef.current.position.x = -smoothX.current * 0.08;
+      mountainFarRef.current.position.z = -smoothZ.current * 0.08 - 210;
     }
 
     if (cityLightsRef.current) {
-      cityLightsRef.current.position.x = -xWrap * 0.12;
-      cityLightsRef.current.position.z = -zWrap * 0.12 - 170;
-      const mat = cityLightsRef.current.material as THREE.PointsMaterial;
-      mat.opacity = 0.35 + 0.15 * Math.sin(state.clock.elapsedTime * 0.7);
+      cityLightsRef.current.position.x = -smoothX.current * 0.12;
+      cityLightsRef.current.position.z = -smoothZ.current * 0.12 - 170;
     }
   });
 
@@ -531,30 +536,43 @@ function CameraController({
     cameraRef.current = camera as THREE.PerspectiveCamera;
   }, [camera]);
 
-  useFrame((_, dt) => {
+  const smoothSteer = useRef(0);
+  const smoothSpeed = useRef(0);
+  const smoothTilt = useRef(0);
+  const smoothPos = useRef(new THREE.Vector3(-2.8, 1.75, -3.4));
+  const smoothFov = useRef(52);
+
+  useFrame(() => {
     if (!cameraRef.current) return;
     const cam = cameraRef.current;
 
     const { speed, steer } = worldRef.current;
     const speedAbs = Math.abs(speed);
 
+    smoothSteer.current = THREE.MathUtils.lerp(smoothSteer.current, steer, 0.06);
+    smoothSpeed.current = THREE.MathUtils.lerp(smoothSpeed.current, speedAbs, 0.08);
+
     const targetPos = new THREE.Vector3(
-      -2.8 - steer * 1.1,
-      1.75 + Math.min(speedAbs * 0.02, 0.7),
+      -2.8 - smoothSteer.current * 1.1,
+      1.75 + Math.min(smoothSpeed.current * 0.02, 0.7),
       -3.4,
     );
-    const lookAt = new THREE.Vector3(0, 0.55 + speedAbs * 0.005, 4.5);
+    const lookAt = new THREE.Vector3(0, 0.55 + smoothSpeed.current * 0.005, 4.5);
 
-    cam.position.lerp(targetPos, 1 - Math.exp(-dt * 4.2));
+    smoothPos.current.lerp(targetPos, 0.08);
+    cam.position.copy(smoothPos.current);
     cam.lookAt(lookAt);
 
-    const targetFov = 52 + Math.min(speedAbs * 0.9, 12);
-    cam.fov = THREE.MathUtils.lerp(cam.fov, targetFov, 1 - Math.exp(-dt * 3.2));
-    cam.rotation.z = THREE.MathUtils.lerp(
-      cam.rotation.z,
-      -steer * 0.05,
-      1 - Math.exp(-dt * 6),
+    const targetTilt = -smoothSteer.current * 0.05;
+    smoothTilt.current = THREE.MathUtils.lerp(smoothTilt.current, targetTilt, 0.06);
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
+    cam.quaternion.premultiply(
+      new THREE.Quaternion().setFromAxisAngle(forward, smoothTilt.current)
     );
+
+    const targetFov = 52 + Math.min(smoothSpeed.current * 0.9, 12);
+    smoothFov.current = THREE.MathUtils.lerp(smoothFov.current, targetFov, 0.08);
+    cam.fov = smoothFov.current;
     cam.updateProjectionMatrix();
   });
 
@@ -578,9 +596,17 @@ function Sky({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
     return g;
   }, []);
 
-  useFrame((state) => {
+  const smoothSpeedRef = useRef(0);
+
+  useFrame((state, dt) => {
     const t = state.clock.elapsedTime;
     const dir = worldRef.current.heading;
+    const safeDt = Math.min(dt, 0.05);
+    smoothSpeedRef.current = THREE.MathUtils.lerp(
+      smoothSpeedRef.current,
+      worldRef.current.speed,
+      1 - Math.exp(-safeDt * 4),
+    );
 
     if (sunRef.current) {
       sunRef.current.position.set(
@@ -593,7 +619,11 @@ function Sky({ worldRef }: { worldRef: MutableRefObject<WorldState> }) {
 
     if (particlesRef.current) {
       particlesRef.current.rotation.y += 0.0008;
-      particlesRef.current.position.z = -worldRef.current.speed * 0.07;
+      particlesRef.current.position.z = THREE.MathUtils.lerp(
+        particlesRef.current.position.z,
+        -smoothSpeedRef.current * 0.07,
+        0.02,
+      );
     }
   });
 
@@ -677,14 +707,14 @@ export function DriveSimulator() {
       >
         <color attach="background" args={['#1a1f2c']} />
 
-        <Sky worldRef={worldRef} />
-        <Terrain worldRef={worldRef} />
         <Car
           gear={gear}
           gripMode={gripMode}
           telemetryRef={telemetryRef}
           worldRef={worldRef}
         />
+        <Sky worldRef={worldRef} />
+        <Terrain worldRef={worldRef} />
         <CameraController worldRef={worldRef} />
 
         <Environment preset="city" />
