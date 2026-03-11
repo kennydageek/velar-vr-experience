@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 type ThemeMode = 'light' | 'dark';
 
@@ -70,11 +70,82 @@ export function EcommerceLanding() {
     setNotice(`${label} started`);
   };
 
+  const autoAnchorTryOn = useCallback(async (imageUrl: string, product = tryOnProduct) => {
+    const category = (product?.category ?? '').toLowerCase();
+
+    if (category.includes('wearables') || category.includes('glasses')) {
+      try {
+        const Img = window.Image;
+        const img = new Img();
+        img.src = imageUrl;
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+        });
+
+        const AnyWin = window as typeof window & {
+          FaceDetector?: new (opts?: { fastMode?: boolean; maxDetectedFaces?: number }) => {
+            detect: (source: CanvasImageSource) => Promise<Array<{ boundingBox: { x: number; y: number; width: number; height: number } }>>;
+          };
+        };
+
+        if (AnyWin.FaceDetector) {
+          const fd = new AnyWin.FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
+          const faces = await fd.detect(img);
+
+          if (faces.length > 0) {
+            const f = faces[0].boundingBox;
+            const faceCenterX = f.x + f.width * 0.5;
+            const eyeLineY = f.y + f.height * 0.34;
+
+            const xPct = ((faceCenterX / img.width) - 0.5) / 0.45 * 100;
+            const yPct = ((eyeLineY / img.height) - 0.38) / 0.45 * 100;
+            const scale = THREE.MathUtils.clamp((f.width / img.width) * 2.2, 0.55, 1.7);
+
+            setOverlayX(THREE.MathUtils.clamp(xPct, -60, 60));
+            setOverlayY(THREE.MathUtils.clamp(yPct, -60, 60));
+            setOverlayScale(scale);
+            setOverlayRotation(0);
+            setNotice('Face detected. Auto-anchored try-on overlay.');
+            return;
+          }
+        }
+      } catch {
+        // fallback below
+      }
+    }
+
+    // fallback defaults by category
+    if (category.includes('wearables') || category.includes('glasses')) {
+      setOverlayX(0);
+      setOverlayY(-8);
+      setOverlayScale(1.05);
+      setOverlayRotation(0);
+    } else if (category.includes('outerwear') || category.includes('apparel')) {
+      setOverlayX(0);
+      setOverlayY(18);
+      setOverlayScale(1.35);
+      setOverlayRotation(0);
+    } else if (category.includes('sneakers')) {
+      setOverlayX(6);
+      setOverlayY(40);
+      setOverlayScale(0.9);
+      setOverlayRotation(-8);
+    } else {
+      setOverlayX(0);
+      setOverlayY(0);
+      setOverlayScale(1);
+      setOverlayRotation(0);
+    }
+  }, [tryOnProduct]);
+
   const onUploadTryOnImage = (file?: File | null) => {
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
-      setTryOnImage(String(reader.result));
+    reader.onload = async () => {
+      const url = String(reader.result);
+      setTryOnImage(url);
+      await autoAnchorTryOn(url);
       setNotice('Image uploaded. Product attached to preview.');
     };
     reader.readAsDataURL(file);
@@ -338,7 +409,11 @@ export function EcommerceLanding() {
                 <label className="mb-1 block text-xs font-semibold tracking-[0.12em]">PRODUCT</label>
                 <select
                   value={tryOnProduct?.name ?? products[0].name}
-                  onChange={(e) => setTryOnProduct(products.find((p) => p.name === e.target.value) ?? products[0])}
+                  onChange={(e) => {
+                    const next = products.find((p) => p.name === e.target.value) ?? products[0];
+                    setTryOnProduct(next);
+                    if (tryOnImage) void autoAnchorTryOn(tryOnImage, next);
+                  }}
                   className={`mb-4 w-full rounded-xl border px-3 py-2 text-sm ${theme === 'dark' ? 'border-white/20 bg-black/30' : 'border-black/15 bg-white'}`}
                 >
                   {products.map((p) => (
