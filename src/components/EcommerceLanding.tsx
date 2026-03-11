@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 type ThemeMode = 'light' | 'dark';
 
@@ -28,6 +28,7 @@ export function EcommerceLanding() {
   const [overlayScale, setOverlayScale] = useState(1);
   const [overlayRotation, setOverlayRotation] = useState(0);
   const [notice, setNotice] = useState<string>('');
+  const tryOnInputRef = useRef<HTMLInputElement | null>(null);
 
   const t = useMemo(() => {
     if (theme === 'dark') {
@@ -140,7 +141,15 @@ export function EcommerceLanding() {
   }, [tryOnProduct]);
 
   const onUploadTryOnImage = (file?: File | null) => {
-    if (!file) return;
+    if (!file) {
+      setNotice('No image selected.');
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      setNotice('Please upload a valid image file.');
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = async () => {
       const url = String(reader.result);
@@ -148,8 +157,11 @@ export function EcommerceLanding() {
       await autoAnchorTryOn(url);
       setNotice('Image uploaded. Product attached to preview.');
     };
+    reader.onerror = () => setNotice('Could not read image. Try another file.');
     reader.readAsDataURL(file);
   };
+
+  const openTryOnPicker = () => tryOnInputRef.current?.click();
 
   const saveTryOnResult = async () => {
     if (!tryOnImage || !tryOnProduct) {
@@ -404,7 +416,27 @@ export function EcommerceLanding() {
 
               <div className={`rounded-2xl border p-4 ${theme === 'dark' ? 'border-white/15 bg-white/5' : 'border-black/10 bg-white/80'}`}>
                 <label className="mb-3 block text-xs font-semibold tracking-[0.12em]">UPLOAD IMAGE</label>
-                <input type="file" accept="image/*" onChange={(e) => onUploadTryOnImage(e.target.files?.[0])} className="mb-4 block w-full text-xs" />
+                <input
+                  ref={tryOnInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="user"
+                  onChange={(e) => onUploadTryOnImage(e.target.files?.[0])}
+                  className="hidden"
+                />
+                <button onClick={openTryOnPicker} className="mb-2 w-full rounded-xl bg-cyan-500 px-3 py-2 text-xs font-semibold text-white">
+                  Upload / Take Photo
+                </button>
+                <div
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    onUploadTryOnImage(e.dataTransfer.files?.[0]);
+                  }}
+                  className={`mb-4 rounded-xl border border-dashed p-3 text-xs ${theme === 'dark' ? 'border-white/25 text-white/70' : 'border-black/20 text-black/60'}`}
+                >
+                  Drag & drop image here (optional)
+                </div>
 
                 <label className="mb-1 block text-xs font-semibold tracking-[0.12em]">PRODUCT</label>
                 <select
