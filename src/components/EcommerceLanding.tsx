@@ -2,21 +2,25 @@
 
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 type ThemeMode = 'light' | 'dark';
 
 const products = [
-  { name: 'Aether Runner', price: '$149', oldPrice: '$189', tag: 'New', hue: 'from-cyan-400 to-blue-600', category: 'Sneakers' },
-  { name: 'Nova Jacket', price: '$219', oldPrice: '$269', tag: 'Best Seller', hue: 'from-fuchsia-400 to-violet-600', category: 'Outerwear' },
-  { name: 'Flux Headset', price: '$179', oldPrice: '$229', tag: 'Limited', hue: 'from-amber-400 to-orange-600', category: 'Audio' },
-  { name: 'Orbit Glasses', price: '$129', oldPrice: '$159', tag: 'Trending', hue: 'from-emerald-400 to-teal-600', category: 'Wearables' },
-  { name: 'Pulse Hoodie', price: '$99', oldPrice: '$129', tag: 'Sale', hue: 'from-rose-400 to-pink-600', category: 'Apparel' },
-  { name: 'Neo Watch', price: '$249', oldPrice: '$299', tag: 'Premium', hue: 'from-indigo-400 to-blue-700', category: 'Accessories' },
+  { name: 'Aether Runner', price: '$149', oldPrice: '$189', tag: 'New', hue: 'from-cyan-400 to-blue-600', category: 'Sneakers', image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80' },
+  { name: 'Nova Jacket', price: '$219', oldPrice: '$269', tag: 'Best Seller', hue: 'from-fuchsia-400 to-violet-600', category: 'Outerwear', image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=900&q=80' },
+  { name: 'Flux Headset', price: '$179', oldPrice: '$229', tag: 'Limited', hue: 'from-amber-400 to-orange-600', category: 'Audio', image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=900&q=80' },
+  { name: 'Orbit Glasses', price: '$129', oldPrice: '$159', tag: 'Trending', hue: 'from-emerald-400 to-teal-600', category: 'Wearables', image: 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=900&q=80' },
+  { name: 'Pulse Hoodie', price: '$99', oldPrice: '$129', tag: 'Sale', hue: 'from-rose-400 to-pink-600', category: 'Apparel', image: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?auto=format&fit=crop&w=900&q=80' },
+  { name: 'Neo Watch', price: '$249', oldPrice: '$299', tag: 'Premium', hue: 'from-indigo-400 to-blue-700', category: 'Accessories', image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=900&q=80' },
 ];
 
 export function EcommerceLanding() {
   const [theme, setTheme] = useState<ThemeMode>('dark');
+  const [cartCount, setCartCount] = useState(0);
+  const [activeProduct, setActiveProduct] = useState<(typeof products)[number] | null>(null);
+  const [tryOnSession, setTryOnSession] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string>('');
 
   const t = useMemo(() => {
     if (theme === 'dark') {
@@ -38,6 +42,17 @@ export function EcommerceLanding() {
     };
   }, [theme]);
 
+  useEffect(() => {
+    if (!notice) return;
+    const id = window.setTimeout(() => setNotice(''), 1800);
+    return () => window.clearTimeout(id);
+  }, [notice]);
+
+  const addToCart = (name: string) => {
+    setCartCount((v) => v + 1);
+    setNotice(`${name} added to cart`);
+  };
+
   return (
     <main className={`min-h-screen transition-colors duration-500 ${t.bg} ${t.text}`}>
       <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${t.glow}`} />
@@ -50,6 +65,12 @@ export function EcommerceLanding() {
             className={`rounded-full border px-4 py-2 text-xs tracking-[0.2em] ${theme === 'dark' ? 'border-white/25' : 'border-black/20'}`}
           >
             {theme === 'dark' ? 'LIGHT MODE' : 'DARK MODE'}
+          </button>
+          <button
+            onClick={() => setNotice(`Cart has ${cartCount} item${cartCount === 1 ? '' : 's'}`)}
+            className={`rounded-full border px-4 py-2 text-xs tracking-[0.15em] ${theme === 'dark' ? 'border-white/25' : 'border-black/20'}`}
+          >
+            CART ({cartCount})
           </button>
           <Link href="/drive" className="rounded-full bg-cyan-500 px-4 py-2 text-xs font-semibold tracking-[0.15em] text-white">
             DEMO DRIVE
@@ -69,8 +90,8 @@ export function EcommerceLanding() {
             A high-converting storefront built with immersive interactions, animated product storytelling, and seamless light/dark experiences.
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
-            <button className="rounded-full bg-white px-6 py-3 text-sm font-semibold text-black">Shop Collection</button>
-            <button className={`rounded-full border px-6 py-3 text-sm ${theme === 'dark' ? 'border-white/30' : 'border-black/20'}`}>Watch Story</button>
+            <button onClick={() => setNotice('Opened collection')} className="rounded-full bg-white px-6 py-3 text-sm font-semibold text-black">Shop Collection</button>
+            <button onClick={() => setNotice('Playing brand story')} className={`rounded-full border px-6 py-3 text-sm ${theme === 'dark' ? 'border-white/30' : 'border-black/20'}`}>Watch Story</button>
           </div>
         </motion.div>
 
@@ -104,7 +125,7 @@ export function EcommerceLanding() {
                 </div>
                 <div className="mt-3 flex items-center justify-between">
                   <p className="text-sm font-medium">{p.price} <span className={`ml-1 text-xs line-through ${t.soft}`}>{p.oldPrice}</span></p>
-                  <button className="rounded-full bg-cyan-500 px-3 py-1 text-[11px] font-semibold text-white">ADD</button>
+                  <button onClick={() => addToCart(p.name)} className="rounded-full bg-cyan-500 px-3 py-1 text-[11px] font-semibold text-white">ADD</button>
                 </div>
               </motion.div>
             ))}
@@ -118,13 +139,13 @@ export function EcommerceLanding() {
             <p className={`text-xs tracking-[0.25em] ${t.soft}`}>DUMMY PRODUCT CATALOG</p>
             <h2 className="mt-1 text-2xl font-semibold md:text-4xl">Featured Products + Pricing</h2>
           </div>
-          <button className={`rounded-full border px-4 py-2 text-xs ${theme === 'dark' ? 'border-white/25' : 'border-black/20'}`}>View All</button>
+          <button onClick={() => setNotice('Showing all products')} className={`rounded-full border px-4 py-2 text-xs ${theme === 'dark' ? 'border-white/25' : 'border-black/20'}`}>View All</button>
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
           {products.map((p) => (
             <motion.article key={p.name} whileHover={{ y: -8 }} className={`rounded-2xl border p-5 ${t.card}`}>
-              <div className={`mb-4 h-36 rounded-2xl bg-gradient-to-br ${p.hue}`} />
+              <img src={p.image} alt={p.name} className="mb-4 h-36 w-full rounded-2xl object-cover" />
               <p className={`text-xs ${t.soft}`}>{p.category}</p>
               <h3 className="mt-1 text-lg font-semibold">{p.name}</h3>
               <p className={`mt-1 text-xs ${t.soft}`}>{p.tag}</p>
@@ -133,8 +154,8 @@ export function EcommerceLanding() {
                 <p className={`text-sm line-through ${t.soft}`}>{p.oldPrice}</p>
               </div>
               <div className="mt-4 flex gap-2">
-                <button className="rounded-full bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-white">Add to Cart</button>
-                <button className={`rounded-full border px-3 py-1.5 text-xs ${theme === 'dark' ? 'border-white/25' : 'border-black/20'}`}>Quick View</button>
+                <button onClick={() => addToCart(p.name)} className="rounded-full bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-white">Add to Cart</button>
+                <button onClick={() => setActiveProduct(p)} className={`rounded-full border px-3 py-1.5 text-xs ${theme === 'dark' ? 'border-white/25' : 'border-black/20'}`}>Quick View</button>
               </div>
             </motion.article>
           ))}
@@ -152,7 +173,14 @@ export function EcommerceLanding() {
 
           <div className="mt-5 grid gap-3 md:grid-cols-3">
             {['Try Glasses in AR', 'Try Sneakers On-Foot', 'Try Jacket on Avatar'].map((label, i) => (
-              <button key={label} className={`rounded-2xl border p-4 text-left transition hover:scale-[1.02] ${theme === 'dark' ? 'border-white/15 bg-black/30' : 'border-black/10 bg-white/90'}`}>
+              <button
+                key={label}
+                onClick={() => {
+                  setTryOnSession(label);
+                  setNotice(`${label} started`);
+                }}
+                className={`rounded-2xl border p-4 text-left transition hover:scale-[1.02] ${theme === 'dark' ? 'border-white/15 bg-black/30' : 'border-black/10 bg-white/90'}`}
+              >
                 <p className="text-sm font-semibold">{label}</p>
                 <p className={`mt-1 text-xs ${t.soft}`}>Session {i + 1} · Ready</p>
               </button>
@@ -173,6 +201,49 @@ export function EcommerceLanding() {
           </motion.article>
         ))}
       </section>
+
+      {activeProduct && (
+        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/55 p-4" onClick={() => setActiveProduct(null)}>
+          <div className={`w-full max-w-xl rounded-3xl border p-5 ${t.card}`} onClick={(e) => e.stopPropagation()}>
+            <img src={activeProduct.image} alt={activeProduct.name} className="h-52 w-full rounded-2xl object-cover" />
+            <p className={`mt-3 text-xs ${t.soft}`}>{activeProduct.category} · {activeProduct.tag}</p>
+            <h3 className="mt-1 text-2xl font-semibold">{activeProduct.name}</h3>
+            <p className={`mt-2 ${t.soft}`}>Premium dummy product for demo storefront interactions and quick-buy workflow.</p>
+            <div className="mt-4 flex items-center gap-3">
+              <p className="text-xl font-semibold">{activeProduct.price}</p>
+              <p className={`text-sm line-through ${t.soft}`}>{activeProduct.oldPrice}</p>
+            </div>
+            <div className="mt-5 flex gap-2">
+              <button onClick={() => addToCart(activeProduct.name)} className="rounded-full bg-cyan-500 px-4 py-2 text-sm font-semibold text-white">Add to Cart</button>
+              <button onClick={() => setTryOnSession(`Try ${activeProduct.name}`)} className={`rounded-full border px-4 py-2 text-sm ${theme === 'dark' ? 'border-white/25' : 'border-black/20'}`}>Virtual Try-On</button>
+              <button onClick={() => setActiveProduct(null)} className={`rounded-full border px-4 py-2 text-sm ${theme === 'dark' ? 'border-white/25' : 'border-black/20'}`}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tryOnSession && (
+        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/65 p-4" onClick={() => setTryOnSession(null)}>
+          <div className={`w-full max-w-2xl rounded-3xl border p-5 ${t.card}`} onClick={(e) => e.stopPropagation()}>
+            <p className={`text-xs tracking-[0.2em] ${t.soft}`}>LIVE TRY-ON SESSION</p>
+            <h3 className="mt-2 text-2xl font-semibold">{tryOnSession}</h3>
+            <div className={`mt-4 h-64 rounded-2xl border ${theme === 'dark' ? 'border-white/15 bg-black/40' : 'border-black/10 bg-white/90'} flex items-center justify-center`}>
+              <p className={`text-sm ${t.soft}`}>Camera preview simulated for demo · model alignment active</p>
+            </div>
+            <div className="mt-4 flex gap-2">
+              <button onClick={() => setNotice('Snapshot saved to fitting session')} className="rounded-full bg-cyan-500 px-4 py-2 text-sm font-semibold text-white">Capture Fit</button>
+              <button onClick={() => setNotice('Size recommendation generated')} className={`rounded-full border px-4 py-2 text-sm ${theme === 'dark' ? 'border-white/25' : 'border-black/20'}`}>Suggest Size</button>
+              <button onClick={() => setTryOnSession(null)} className={`rounded-full border px-4 py-2 text-sm ${theme === 'dark' ? 'border-white/25' : 'border-black/20'}`}>End Session</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {notice && (
+        <div className="fixed bottom-5 right-5 z-40 rounded-full bg-cyan-500 px-4 py-2 text-sm font-medium text-white shadow-lg">
+          {notice}
+        </div>
+      )}
     </main>
   );
 }
