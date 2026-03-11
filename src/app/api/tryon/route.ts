@@ -20,7 +20,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'personImage and garmentImage are required' }, { status: 400 });
     }
 
-    const model = process.env.TRYON_MODEL ?? 'wavespeedai/virtual-try-on';
+    const version = process.env.TRYON_MODEL_VERSION;
+    if (!version) {
+      return NextResponse.json(
+        { error: 'Missing TRYON_MODEL_VERSION env var (Replicate model version id)' },
+        { status: 500 },
+      );
+    }
 
     const createRes = await fetch('https://api.replicate.com/v1/predictions', {
       method: 'POST',
@@ -29,12 +35,13 @@ export async function POST(req: Request) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        version: undefined,
-        model,
+        version,
         input: {
           person_image: body.personImage,
           garment_image: body.garmentImage,
-          prompt: body.prompt ?? 'Generate a realistic ecommerce virtual try-on image. Preserve face identity and scene.',
+          prompt:
+            body.prompt ??
+            'Generate a realistic ecommerce virtual try-on image. Preserve face identity and scene.',
         },
       }),
     });
