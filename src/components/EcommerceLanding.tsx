@@ -5,17 +5,10 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { products } from '@/lib/products';
 
 type ThemeMode = 'light' | 'dark';
 
-const products = [
-  { name: 'Aether Runner', price: '$149', oldPrice: '$189', tag: 'New', hue: 'from-cyan-400 to-blue-600', category: 'Sneakers', image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80' },
-  { name: 'Nova Jacket', price: '$219', oldPrice: '$269', tag: 'Best Seller', hue: 'from-fuchsia-400 to-violet-600', category: 'Outerwear', image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=900&q=80' },
-  { name: 'Flux Headset', price: '$179', oldPrice: '$229', tag: 'Limited', hue: 'from-amber-400 to-orange-600', category: 'Audio', image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=900&q=80' },
-  { name: 'Orbit Glasses', price: '$129', oldPrice: '$159', tag: 'Trending', hue: 'from-emerald-400 to-teal-600', category: 'Wearables', image: 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=900&q=80' },
-  { name: 'Pulse Hoodie', price: '$99', oldPrice: '$129', tag: 'Sale', hue: 'from-rose-400 to-pink-600', category: 'Apparel', image: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?auto=format&fit=crop&w=900&q=80' },
-  { name: 'Neo Watch', price: '$249', oldPrice: '$299', tag: 'Premium', hue: 'from-indigo-400 to-blue-700', category: 'Accessories', image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=900&q=80' },
-];
 
 export function EcommerceLanding() {
   const [theme, setTheme] = useState<ThemeMode>('dark');
@@ -431,11 +424,13 @@ export function EcommerceLanding() {
         <div className="grid gap-4 md:grid-cols-3">
           {products.map((p) => (
             <motion.article key={p.name} whileHover={{ y: -8 }} className={`rounded-2xl border p-5 ${t.card}`}>
-              <div className="relative mb-4 h-36 w-full overflow-hidden rounded-2xl">
+              <Link href={`/products/${p.slug}`} className="relative mb-4 block h-36 w-full overflow-hidden rounded-2xl">
                 <Image src={p.image} alt={p.name} fill className="object-cover" sizes="(max-width: 768px) 100vw, 33vw" />
-              </div>
+              </Link>
               <p className={`text-xs ${t.soft}`}>{p.category}</p>
-              <h3 className="mt-1 text-lg font-semibold">{p.name}</h3>
+              <h3 className="mt-1 text-lg font-semibold">
+                <Link href={`/products/${p.slug}`} className="hover:underline">{p.name}</Link>
+              </h3>
               <p className={`mt-1 text-xs ${t.soft}`}>{p.tag}</p>
               <div className="mt-3 flex items-center gap-2">
                 <p className="text-lg font-semibold">{p.price}</p>
@@ -444,6 +439,7 @@ export function EcommerceLanding() {
               <div className="mt-4 flex gap-2">
                 <button onClick={() => addToCart(p.name)} className="rounded-full bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-white">Add to Cart</button>
                 <button onClick={() => setActiveProduct(p)} className={`rounded-full border px-3 py-1.5 text-xs ${theme === 'dark' ? 'border-white/25' : 'border-black/20'}`}>Quick View</button>
+                <Link href={`/products/${p.slug}`} className={`rounded-full border px-3 py-1.5 text-xs ${theme === 'dark' ? 'border-white/25' : 'border-black/20'}`}>View</Link>
               </div>
             </motion.article>
           ))}
