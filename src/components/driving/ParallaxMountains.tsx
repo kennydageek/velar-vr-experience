@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import * as THREE from 'three';
 import { fbm } from '@/lib/noise';
 
@@ -14,9 +14,16 @@ const SEGMENTS = 64;
 function createMountainGeometry(
   radius: number,
   segments: number,
-  heightScale: number
+  heightScale: number,
 ) {
-  const g = new THREE.CylinderGeometry(0, radius, heightScale, segments, 1, true);
+  const g = new THREE.CylinderGeometry(
+    0,
+    radius,
+    heightScale,
+    segments,
+    1,
+    true,
+  );
   const pos = g.attributes.position as THREE.BufferAttribute;
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
@@ -43,11 +50,7 @@ export function ParallaxMountains({ worldOffset }: ParallaxMountainsProps) {
 
   const meshes = useMemo(() => {
     return layers.map((layer) => {
-      const geom = createMountainGeometry(
-        layer.radius,
-        SEGMENTS,
-        layer.height
-      );
+      const geom = createMountainGeometry(layer.radius, SEGMENTS, layer.height);
       return { geom, color: layer.color };
     });
   }, [layers]);
